@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --accent: #dc2626;
+  --accent-deep: #9f1239;
+  --page: #f4eef0;
+  --card: #ffffff;
+  --ink: #231a1f;
+  --muted: #8a7a80;
+}
+
+.dark {
+  --page: #0e1422;
+  --card: #161e2e;
+  --ink: #f3eef0;
+  --muted: #9aa3b2;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+}
+
+::placeholder {
+  color: #a79da4;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(136, 19, 55, 0.18);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* The rosy page background with the two faint corner radial tints. */
+.app-bg {
+  background:
+    radial-gradient(900px 520px at 92% -8%, rgba(220, 38, 38, 0.07), transparent 60%),
+    radial-gradient(800px 480px at 4% -6%, rgba(159, 18, 57, 0.06), transparent 55%),
+    var(--page);
+}
+.dark .app-bg {
+  background:
+    radial-gradient(900px 520px at 92% -8%, rgba(220, 38, 38, 0.1), transparent 60%),
+    radial-gradient(800px 480px at 4% -6%, rgba(159, 18, 57, 0.12), transparent 55%),
+    var(--page);
+}
+
+/* ------------------------------------------------------------------ *
+ * Dark-mode token overrides.
+ * The Tailwind palette is authored as fixed light hexes, so dark mode is
+ * implemented by remapping the semantic utility classes here when `.dark`
+ * is present on <html>. Keep these in sync with tailwind.config.js colors.
+ * ------------------------------------------------------------------ */
+.dark ::placeholder { color: #6b7585; }
+.dark ::-webkit-scrollbar-thumb { background: rgba(220, 38, 38, 0.28); }
+
+/* surfaces */
+.dark .bg-card { background-color: #161e2e; }
+.dark .bg-page { background-color: #0e1422; }
+.dark .bg-white { background-color: #161e2e; }
+.dark .bg-fill,
+.dark .bg-fill-2,
+.dark .bg-fill-3 { background-color: #1b2335; }
+.dark .bg-hovertint { background-color: #212b42; }
+.dark .hover\:bg-hovertint:hover { background-color: #283353; }
+.dark .bg-rowtint { background-color: #1a2334; }
+.dark .hover\:bg-rowtint:hover { background-color: #1f2940; }
+.dark .bg-eventchip { background-color: #2a1c28; }
+.dark .bg-neutralpill-bg { background-color: #232c3f; }
+
+/* text */
+.dark .text-ink { color: #f3eef0; }
+.dark .text-ink-2 { color: #e7e0e6; }
+.dark .text-ink-3 { color: #ced5e0; }
+.dark .text-ink-4 { color: #b8c1ce; }
+.dark .text-muted { color: #9aa3b2; }
+.dark .text-muted-2 { color: #8b94a3; }
+.dark .text-muted-3 { color: #79828f; }
+.dark .text-muted-disabled { color: #5c6675; }
+.dark .text-accent-deep { color: #fb7185; }
+
+/* borders */
+.dark .border-line-card { border-color: #243049; }
+.dark .border-line-chip { border-color: #2a3650; }
+.dark .border-line-table { border-color: #222e45; }
+.dark .border-line-topbar { border-color: #243049; }
+.dark .border-line-drop { border-color: #2a3650; }
+
+/* the translucent top-bar surface (kept as a class so it can flip) */
+.topbar-surface { background: rgba(255, 255, 255, 0.92); }
+.dark .topbar-surface { background: rgba(14, 20, 34, 0.92); }
+
+/* dotted texture overlay used on crimson banners */
+.banner-dots {
+  position: absolute;
+  inset: 0;
+  opacity: 0.45;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1.6px);
+  background-size: 18px 18px;
+  pointer-events: none;
+}

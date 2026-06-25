@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">
+  <style>
+    html,body{margin:0;padding:0;background:#F4EEF0;}
+    *{box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+    ::placeholder{color:#A79DA4;}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-thumb{background:rgba(136,19,55,.18);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+    @keyframes rakRise{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+    @keyframes rakPulse{0%,100%{opacity:.5}50%{opacity:1}}
+  </style>
+</helmet>
+
+<div style="--accent: {{ accent }}; --accent-deep:#9F1239; position:relative; min-height:100vh; width:100%; font-family:'Plus Jakarta Sans',system-ui,sans-serif; color:#231A1F; background:radial-gradient(900px 520px at 92% -8%, rgba(220,38,38,0.07), transparent 60%), radial-gradient(800px 480px at 4% -6%, rgba(159,18,57,0.06), transparent 55%), #F4EEF0;">
+
+  <!-- ===================== TOP BAR ===================== -->
+  <div style="position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:24px; padding:14px 34px; background:rgba(255,255,255,0.92); backdrop-filter:blur(12px); border-bottom:1px solid #ECE0E4;">
+    <div onClick="{{ goHome }}" style="display:flex; align-items:center; gap:11px; cursor:pointer; flex-shrink:0;">
+      <svg width="30" height="34" viewBox="0 0 30 34" fill="none"><defs><linearGradient id="rakDrop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E11D48"/><stop offset="1" stop-color="#9F1239"/></linearGradient></defs><path d="M15 1.5C15 1.5 26.5 14 26.5 22.8A11.5 11.5 0 0 1 3.5 22.8C3.5 14 15 1.5 15 1.5Z" fill="url(#rakDrop)"/><polyline points="7.5,22 11,22 13,17.5 16,26.5 18,22 22.5,22" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:23px; letter-spacing:-.5px; color:#231A1F;">Rakkhtt</span>
+    </div>
+
+    <div style="flex:1; max-width:520px; display:flex; align-items:center; gap:10px; padding:11px 18px; border-radius:999px; background:#F4EEF0; border:1px solid transparent;" style-focus-within="border-color:var(--accent,#DC2626);background:#fff">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A79DA4" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input value="{{ topSearch }}" onChange="{{ setTopSearch }}" placeholder="Search donors, bags, requests…" style="flex:1; background:none; border:none; outline:none; font:500 15px 'Plus Jakarta Sans',sans-serif; color:#231A1F;" />
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <div style="position:relative; flex-shrink:0;">
+      <div onClick="{{ toggleCentre }}" style="display:flex; align-items:center; gap:12px; padding:9px 16px; border-radius:13px; background:#F4EEF0; cursor:pointer; border:1px solid #EBDFE3;" style-hover="border-color:#E3C9D1">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent,#DC2626)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01"/></svg>
+        <span style="font-weight:600; font-size:14.5px; color:#3A2C32; max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ centre }}</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9A8C92" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <sc-if value="{{ centreOpen }}" hint-placeholder-val="">
+        <div style="position:absolute; top:54px; right:0; width:290px; padding:8px; background:#fff; border:1px solid #EFE4E8; border-radius:16px; box-shadow:0 18px 48px rgba(80,20,40,.16); z-index:80; animation:rakRise .14s ease;">
+          <sc-for list="{{ centres }}" as="c" hint-placeholder-count="3">
+            <div onClick="{{ c.pick }}" style="{{ c.style }}">
+              <span style="{{ c.dot }}"></span>{{ c.name }}
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="position:relative; flex-shrink:0;">
+      <div onClick="{{ toggleUser }}" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#E11D48,#9F1239); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:16px; box-shadow:0 4px 12px rgba(159,18,57,.3);">V</div>
+        <div style="line-height:1.15;"><div style="font-weight:700; font-size:14.5px; color:#231A1F;">Vipul Sharma</div><div style="font-size:12px; color:#9A8C92;">Administrator</div></div>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9A8C92" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <sc-if value="{{ userOpen }}" hint-placeholder-val="">
+        <div style="position:absolute; top:54px; right:0; width:210px; padding:8px; background:#fff; border:1px solid #EFE4E8; border-radius:16px; box-shadow:0 18px 48px rgba(80,20,40,.16); z-index:80; animation:rakRise .14s ease;">
+          <sc-for list="{{ userMenu }}" as="u" hint-placeholder-count="3">
+            <div onClick="{{ u.act }}" style="display:flex; align-items:center; gap:11px; padding:11px 13px; border-radius:11px; cursor:pointer; font-weight:600; font-size:14.5px; color:#4A3A40;" style-hover="background:#FBEEF1; color:var(--accent-deep)">{{ u.label }}</div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ===================== NAV BAR ===================== -->
+  <div onMouseLeave="{{ leaveMenu }}" style="position:sticky; top:71px; z-index:50; display:flex; align-items:stretch; gap:2px; padding:0 26px; background:linear-gradient(95deg,#7C1330 0%,#9F1239 48%,#BE1240 100%); box-shadow:0 6px 20px rgba(124,19,48,.22);">
+    <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="8">
+      <div onMouseEnter="{{ n.onEnter }}" style="position:relative;">
+        <button onClick="{{ n.onClick }}" style="{{ n.btnStyle }}">{{ n.label }}<sc-if value="{{ n.hasMenu }}" hint-placeholder-val=""><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7;margin-left:1px;"><path d="m6 9 6 6 6-6"/></svg></sc-if></button>
+        <sc-if value="{{ n.active }}" hint-placeholder-val=""><div style="position:absolute; left:14px; right:14px; bottom:0; height:3px; border-radius:3px 3px 0 0; background:#fff;"></div></sc-if>
+        <sc-if value="{{ n.open }}" hint-placeholder-val="">
+          <div style="position:absolute; top:100%; left:8px; min-width:248px; padding:10px; background:#fff; border:1px solid #EFE4E8; border-radius:0 0 16px 16px; box-shadow:0 22px 50px rgba(60,15,30,.20); animation:rakRise .14s ease;">
+            <sc-for list="{{ n.menu }}" as="mi" hint-placeholder-count="4">
+              <sc-if value="{{ mi.isHead }}" hint-placeholder-val=""><div style="padding:11px 12px 6px; font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:13.5px; color:#231A1F;">{{ mi.label }}</div></sc-if>
+              <sc-if value="{{ mi.isItem }}" hint-placeholder-val=""><div onClick="{{ mi.go }}" style="display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600; font-size:14.5px; color:#5A4A50;" style-hover="background:#FBEEF1; color:var(--accent-deep)"><span style="{{ mi.marker }}"></span><span style="flex:1;">{{ mi.label }}</span><sc-if value="{{ mi.chev }}" hint-placeholder-val=""><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8A9AF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></sc-if></div></sc-if>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ backdropOn }}" hint-placeholder-val=""><div onClick="{{ closeAll }}" style="position:fixed; inset:0; z-index:40;"></div></sc-if>
+
+  <!-- ===================== PAGE CONTENT ===================== -->
+  <div style="position:relative; z-index:3; max-width:1320px; margin:0 auto; padding:30px 30px 70px;">
+
+    <!-- ========== HOME ========== -->
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px;">
+        <div>
+          <h1 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:30px; margin:0; letter-spacing:-.6px;">Good morning, Vipul</h1>
+          <p style="margin:6px 0 0; font-size:15px; color:#8A7A80;">Here's what's happening at your blood centre today.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button onClick="{{ goReception }}" style="display:flex; align-items:center; gap:8px; padding:12px 18px; border-radius:13px; border:none; background:var(--accent,#DC2626); color:#fff; font:700 14.5px 'Plus Jakarta Sans',sans-serif; cursor:pointer; box-shadow:0 8px 22px rgba(220,38,38,.28);" style-hover="filter:brightness(1.06)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New Request</button>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-bottom:20px;">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+          <div style="position:relative; overflow:hidden; background:#fff; border:1px solid #F0E6EA; border-radius:18px; padding:22px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-size:13px; font-weight:600; color:#8A7A80;">{{ k.label }}</span>
+              <span style="{{ k.iconWrap }}">{{ k.icon }}</span>
+            </div>
+            <div style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:38px; line-height:1; margin:14px 0 8px; letter-spacing:-1px;">{{ k.value }}</div>
+            <span style="{{ k.deltaStyle }}">{{ k.delta }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1.7fr 1fr; gap:18px; align-items:start;">
+        <!-- stock table card -->
+        <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+            <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:19px; margin:0;">Blood Stock by Component</h2>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="position:relative;">
+                <div onClick="{{ toggleStock }}" style="display:flex; align-items:center; gap:9px; padding:9px 14px; border-radius:11px; border:1px solid #EBDFE3; background:#FBF7F8; cursor:pointer; font-weight:600; font-size:13.5px; color:#4A3A40;">{{ stockType }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9A8C92" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>
+                <sc-if value="{{ stockOpen }}" hint-placeholder-val="">
+                  <div style="position:absolute; top:44px; left:0; width:180px; padding:7px; background:#fff; border:1px solid #EFE4E8; border-radius:13px; box-shadow:0 16px 40px rgba(80,20,40,.16); z-index:30;">
+                    <sc-for list="{{ stockTypes }}" as="st" hint-placeholder-count="3"><div onClick="{{ st.pick }}" style="{{ st.style }}">{{ st.name }}</div></sc-for>
+                  </div>
+                </sc-if>
+              </div>
+              <button style="padding:9px 15px; border-radius:11px; border:none; background:#15803D; color:#fff; font:700 13px 'Plus Jakarta Sans',sans-serif; cursor:pointer;" style-hover="filter:brightness(1.07)">Excel</button>
+              <button style="padding:9px 15px; border-radius:11px; border:none; background:var(--accent,#DC2626); color:#fff; font:700 13px 'Plus Jakarta Sans',sans-serif; cursor:pointer;" style-hover="filter:brightness(1.07)">PDF</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:14.5px;">
+              <thead>
+                <tr style="text-align:right;">
+                  <th style="text-align:left; padding:10px 8px; font-weight:700; color:#8A7A80; font-size:12.5px; letter-spacing:.4px;">COMPONENT</th>
+                  <sc-for list="{{ groups }}" as="g" hint-placeholder-count="8"><th style="padding:10px 10px; font-weight:700; color:#8A7A80; font-size:12.5px;">{{ g }}</th></sc-for>
+                  <th style="padding:10px 10px; font-weight:800; color:var(--accent-deep); font-size:12.5px;">TOTAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ stockRows }}" as="r" hint-placeholder-count="4">
+                  <tr style="border-top:1px solid #F2E9EC;">
+                    <td style="text-align:left; padding:13px 8px;"><span style="{{ r.tag }}">{{ r.comp }}</span></td>
+                    <sc-for list="{{ r.cells }}" as="cv" hint-placeholder-count="8"><td style="{{ cv.style }}">{{ cv.v }}</td></sc-for>
+                    <td style="text-align:right; padding:13px 10px; font-weight:800; color:var(--accent-deep);">{{ r.total }}</td>
+                  </tr>
+                </sc-for>
+                <tr style="border-top:2px solid #EBDFE3; background:#FBF5F7;">
+                  <td style="text-align:left; padding:14px 8px; font-weight:800;">Total</td>
+                  <sc-for list="{{ totalCells }}" as="tc" hint-placeholder-count="8"><td style="text-align:right; padding:14px 10px; font-weight:800;">{{ tc }}</td></sc-for>
+                  <td style="text-align:right; padding:14px 10px; font-weight:800; color:var(--accent-deep); font-size:16px;">{{ grandTotal }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- right column: work done + donut -->
+        <div style="display:flex; flex-direction:column; gap:18px;">
+          <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+            <div style="display:flex; align-items:center; gap:16px; margin-bottom:18px;">
+              <div style="position:relative; width:78px; height:78px; flex-shrink:0;">
+                <div style="position:absolute; inset:0; border-radius:50%; background:{{ workRing }};"></div>
+                <div style="position:absolute; inset:9px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:19px; color:#231A1F;">{{ workPct }}</div>
+              </div>
+              <div><h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:18px; margin:0;">Work Completed Today</h2><p style="margin:4px 0 0; font-size:13.5px; color:#8A7A80;">33 of 42 tasks done</p></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:11px;">
+              <sc-for list="{{ workItems }}" as="w" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span style="width:9px; height:9px; border-radius:50%; background:{{ w.color }}; flex-shrink:0;"></span>
+                  <span style="flex:1; font-size:14px; font-weight:600; color:#4A3A40;">{{ w.label }}</span>
+                  <span style="font-weight:700; font-size:14px; color:#231A1F;">{{ w.count }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+            <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:18px; margin:0 0 18px;">Component Split</h2>
+            <div style="display:flex; align-items:center; gap:22px;">
+              <div style="position:relative; width:140px; height:140px; flex-shrink:0;">
+                <div style="position:absolute; inset:0; border-radius:50%; background:{{ compDonut }};"></div>
+                <div style="position:absolute; inset:24px; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center;"><span style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:26px; color:#231A1F;">{{ grandTotal }}</span><span style="font-size:11px; letter-spacing:.6px; color:#9A8C92; font-weight:600;">UNITS</span></div>
+              </div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+                <sc-for list="{{ compLegend }}" as="l" hint-placeholder-count="4">
+                  <div style="display:flex; align-items:center; gap:10px;"><span style="width:11px; height:11px; border-radius:3px; background:{{ l.color }};"></span><span style="flex:1; font-size:13.5px; font-weight:600; color:#4A3A40;">{{ l.label }}</span><span style="font-weight:700; font-size:13.5px; color:#231A1F;">{{ l.value }}</span></div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- group bar chart -->
+      <div style="margin-top:18px; background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px 26px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+        <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:19px; margin:0 0 22px;">Available Units by Blood Group</h2>
+        <div style="display:flex; align-items:flex-end; gap:16px; height:180px;">
+          <sc-for list="{{ groupBars }}" as="b" hint-placeholder-count="8">
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:9px; height:100%;">
+              <span style="font-weight:800; font-size:14px; color:#231A1F; font-family:'Bricolage Grotesque',sans-serif;">{{ b.value }}</span>
+              <div style="{{ b.barStyle }}"></div>
+              <span style="font-size:13px; font-weight:700; color:#8A7A80;">{{ b.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ========== RECEPTION ========== -->
+    <sc-if value="{{ isReception }}" hint-placeholder-val="">
+      <div style="position:relative; overflow:hidden; border-radius:20px; padding:26px 30px; color:#fff; margin-bottom:22px; background:linear-gradient(115deg,#7F1D2E 0%,#A4163A 52%,#C81E4A 100%); box-shadow:0 14px 36px rgba(150,20,50,.22);">
+        <div style="position:absolute; inset:0; background-image:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.6px); background-size:18px 18px; opacity:.45;"></div>
+        <div style="position:relative; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:12px;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 14 2 2 4-4"/></svg><h1 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:27px; margin:0;">Reception</h1></div>
+            <p style="margin:8px 0 0; font-size:14.5px; color:rgba(255,255,255,.78);">Blood issue requests, billing &amp; serology status</p>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button style="display:flex; align-items:center; gap:7px; padding:11px 18px; border-radius:12px; border:none; background:#fff; color:var(--accent-deep); font:700 14px 'Plus Jakarta Sans',sans-serif; cursor:pointer;" style-hover="filter:brightness(.97)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+            <button style="display:flex; align-items:center; gap:7px; padding:11px 18px; border-radius:12px; border:1px solid rgba(255,255,255,.45); background:rgba(255,255,255,.10); color:#fff; font:700 14px 'Plus Jakarta Sans',sans-serif; cursor:pointer;" style-hover="background:rgba(255,255,255,.18)">Return To Stock</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05); overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:4px; padding:8px 14px 0; border-bottom:1px solid #F2E9EC;">
+          <sc-for list="{{ recTabs }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.name }}</button></sc-for>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; padding:18px 22px;">
+          <div style="display:flex; align-items:center; gap:10px; padding:10px 16px; border-radius:11px; background:#F7F1F3; border:1px solid transparent; min-width:280px;" style-focus-within="border-color:var(--accent,#DC2626);background:#fff">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#A79DA4" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input value="{{ recSearch }}" onChange="{{ setRecSearch }}" placeholder="Search patient or request ID…" style="flex:1; background:none; border:none; outline:none; font:500 14.5px 'Plus Jakarta Sans',sans-serif; color:#231A1F;" />
+          </div>
+          <div onClick="{{ togglePending }}" style="display:flex; align-items:center; gap:11px; cursor:pointer; user-select:none;">
+            <span style="font-size:14px; font-weight:600; color:#4A3A40;">Show Pending Only</span>
+            <span style="{{ toggleTrack }}"><span style="{{ toggleKnob }}"></span></span>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:14.5px;">
+            <thead><tr style="background:#FBF5F7;">
+              <th onClick="{{ sortDate }}" style="text-align:left; padding:14px 22px; font-weight:700; color:#8A7A80; font-size:12.5px; letter-spacing:.4px; cursor:pointer;">DATE {{ dateArrow }}</th>
+              <th style="text-align:left; padding:14px 14px; font-weight:700; color:#8A7A80; font-size:12.5px; letter-spacing:.4px;">REQUEST ID</th>
+              <th onClick="{{ sortPatient }}" style="text-align:left; padding:14px 14px; font-weight:700; color:#8A7A80; font-size:12.5px; letter-spacing:.4px; cursor:pointer;">PATIENT {{ patientArrow }}</th>
+              <th style="text-align:left; padding:14px 14px; font-weight:700; color:#8A7A80; font-size:12.5px; letter-spacing:.4px;">COMPONENT</th>
+              <th style="text-align:center; padding:14px 14px; font-weight:700; color:#8A7A80; font-size:12.5px; letter-spacing:.4px;">BILLING</th>
+              <th style="text-align:center; padding:14px 22px; font-weight:700; color:#8A7A80; font-size:12.5px; letter-spacing:.4px;">SEROLOGY</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ recRows }}" as="r" hint-placeholder-count="6">
+                <tr style="border-top:1px solid #F2E9EC;" style-hover="background:#FCF8F9">
+                  <td style="padding:15px 22px; color:#4A3A40; font-weight:500;">{{ r.date }}</td>
+                  <td style="padding:15px 14px;"><span style="font-weight:700; color:var(--accent,#DC2626);">{{ r.id }}</span></td>
+                  <td style="padding:15px 14px; font-weight:600; color:#231A1F;">{{ r.patient }}</td>
+                  <td style="padding:15px 14px;"><span style="{{ r.compTag }}">{{ r.comp }}</span></td>
+                  <td style="padding:15px 14px; text-align:center;"><span style="{{ r.billStyle }}">{{ r.billing }}</span></td>
+                  <td style="padding:15px 22px; text-align:center;"><span style="{{ r.seroStyle }}">{{ r.serology }}</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <sc-if value="{{ recEmpty }}" hint-placeholder-val=""><div style="padding:46px; text-align:center; color:#A79DA4; font-weight:600;">No requests match your filters.</div></sc-if>
+        </div>
+        <div style="padding:16px 22px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #F2E9EC;">
+          <span style="font-size:13.5px; color:#8A7A80;">{{ recCount }}</span>
+          <div style="display:flex; gap:6px;"><button style="padding:8px 15px; border-radius:9px; border:1px solid #EBDFE3; background:#fff; font:600 13.5px 'Plus Jakarta Sans',sans-serif; color:#8A7A80; cursor:pointer;">Previous</button><button style="padding:8px 14px; border-radius:9px; border:none; background:var(--accent,#DC2626); color:#fff; font:700 13.5px 'Plus Jakarta Sans',sans-serif; cursor:pointer;">1</button><button style="padding:8px 15px; border-radius:9px; border:1px solid #EBDFE3; background:#fff; font:600 13.5px 'Plus Jakarta Sans',sans-serif; color:#4A3A40; cursor:pointer;">Next</button></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ========== ANALYTICS ========== -->
+    <sc-if value="{{ isAnalytics }}" hint-placeholder-val="">
+      <div style="position:relative; overflow:hidden; border-radius:20px; padding:26px 30px; color:#fff; margin-bottom:20px; background:linear-gradient(115deg,#7F1D2E 0%,#A4163A 52%,#C81E4A 100%); box-shadow:0 14px 36px rgba(150,20,50,.22);">
+        <div style="position:absolute; inset:0; background-image:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.6px); background-size:18px 18px; opacity:.45;"></div>
+        <div style="position:relative; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+          <div style="display:flex; align-items:center; gap:12px;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg><h1 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:27px; margin:0;">Analytics</h1></div>
+          <div style="position:relative; display:flex; align-items:center; gap:10px; padding:11px 16px; border-radius:12px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.28);">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <span style="font-weight:600; font-size:14px;">{{ piDate }}</span>
+          </div>
+        </div>
+        <div style="position:relative; display:flex; gap:6px; margin-top:20px;">
+          <sc-for list="{{ anTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.name }}</button></sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{ isPI }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
+          <sc-for list="{{ piCards }}" as="p" hint-placeholder-count="9">
+            <div style="background:#fff; border:1px solid #F0E6EA; border-radius:18px; padding:22px 22px 16px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; min-height:38px;">
+                <span style="font-size:13.5px; font-weight:600; color:#8A7A80; line-height:1.35;">{{ p.label }}</span>
+                <span style="{{ p.pill }}">{{ p.status }}</span>
+              </div>
+              <div style="display:flex; align-items:baseline; gap:5px; margin:14px 0 12px;">
+                <span style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:40px; line-height:1; letter-spacing:-1.5px; color:#231A1F;">{{ p.value }}</span>
+                <span style="font-size:16px; font-weight:700; color:#8A7A80;">{{ p.unit }}</span>
+              </div>
+              <svg viewBox="0 0 120 34" preserveAspectRatio="none" style="width:100%; height:34px; display:block;">
+                <polyline points="{{ p.area }}" fill="{{ p.fill }}" stroke="none" opacity="0.12"/>
+                <polyline points="{{ p.spark }}" fill="none" stroke="{{ p.stroke }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isGraphs }}" hint-placeholder-val="">
+        <div style="display:grid; grid-template-columns:230px 1fr; gap:18px; align-items:start;">
+          <div style="background:#fff; border:1px solid #F0E6EA; border-radius:18px; padding:14px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+            <div style="font-size:12px; font-weight:700; letter-spacing:.8px; color:#A79DA4; padding:8px 12px 10px;">REPORT</div>
+            <sc-for list="{{ graphOpts }}" as="g" hint-placeholder-count="7"><div onClick="{{ g.pick }}" style="{{ g.style }}"><span style="{{ g.marker }}"></span>{{ g.name }}</div></sc-for>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:18px;">
+            <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px 26px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+              <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:19px; margin:0 0 4px;">{{ graphTitle }}</h2>
+              <p style="margin:0 0 22px; font-size:14px; color:#8A7A80;">{{ graphSub }}</p>
+              <div style="display:flex; align-items:flex-end; gap:18px; height:230px;">
+                <sc-for list="{{ graphBars }}" as="b" hint-placeholder-count="6">
+                  <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:10px; height:100%;">
+                    <span style="font-weight:800; font-size:14px; color:#231A1F; font-family:'Bricolage Grotesque',sans-serif;">{{ b.value }}</span>
+                    <div style="{{ b.barStyle }}"></div>
+                    <span style="font-size:12.5px; font-weight:600; color:#8A7A80; text-align:center;">{{ b.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+              <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+                <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:17px; margin:0 0 18px;">Distribution by Group</h2>
+                <div style="display:flex; align-items:center; gap:20px;">
+                  <div style="position:relative; width:130px; height:130px; flex-shrink:0;"><div style="position:absolute; inset:0; border-radius:50%; background:{{ graphDonut }};"></div><div style="position:absolute; inset:22px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:22px;">{{ graphDonutTotal }}</div></div>
+                  <div style="flex:1; display:flex; flex-direction:column; gap:9px;"><sc-for list="{{ graphLegend }}" as="l" hint-placeholder-count="4"><div style="display:flex; align-items:center; gap:9px;"><span style="width:10px; height:10px; border-radius:3px; background:{{ l.color }};"></span><span style="flex:1; font-size:13px; font-weight:600; color:#4A3A40;">{{ l.label }}</span><span style="font-weight:700; font-size:13px;">{{ l.value }}</span></div></sc-for></div>
+                </div>
+              </div>
+              <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+                <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:17px; margin:0 0 18px;">6-Month Trend</h2>
+                <svg viewBox="0 0 300 150" style="width:100%; height:150px; display:block;">
+                  <polyline points="{{ trendArea }}" fill="var(--accent,#DC2626)" opacity="0.08" stroke="none"/>
+                  <polyline points="{{ trendLine }}" fill="none" stroke="var(--accent,#DC2626)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <sc-for list="{{ trendDots }}" as="d" hint-placeholder-count="6"><circle cx="{{ d.x }}" cy="{{ d.y }}" r="3.5" fill="#fff" stroke="var(--accent,#DC2626)" stroke-width="2"/></sc-for>
+                </svg>
+                <div style="display:flex; justify-content:space-between; margin-top:8px;"><sc-for list="{{ trendLabels }}" as="m" hint-placeholder-count="6"><span style="font-size:11.5px; color:#A79DA4; font-weight:600;">{{ m }}</span></sc-for></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <!-- ========== CAMP ========== -->
+    <sc-if value="{{ isCamp }}" hint-placeholder-val="">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:6px; padding:5px; background:#fff; border:1px solid #F0E6EA; border-radius:14px; box-shadow:0 1px 2px rgba(31,18,24,.04);">
+          <sc-for list="{{ campTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.name }}</button></sc-for>
+        </div>
+        <button style="display:flex; align-items:center; gap:8px; padding:12px 18px; border-radius:13px; border:none; background:var(--accent,#DC2626); color:#fff; font:700 14.5px 'Plus Jakarta Sans',sans-serif; cursor:pointer; box-shadow:0 8px 22px rgba(220,38,38,.28);" style-hover="filter:brightness(1.06)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Camp</button>
+      </div>
+
+      <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+            <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:22px; margin:0; letter-spacing:-.4px;">June 2026</h2>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button style="width:38px; height:38px; border-radius:11px; border:1px solid #EBDFE3; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;" style-hover="background:#FBF1F4"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8A7A80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+              <button style="width:38px; height:38px; border-radius:11px; border:1px solid #EBDFE3; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;" style-hover="background:#FBF1F4"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8A7A80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+              <button style="padding:9px 18px; border-radius:11px; border:1px solid #EBDFE3; background:#fff; font:700 13.5px 'Plus Jakarta Sans',sans-serif; color:var(--accent,#DC2626); cursor:pointer;" style-hover="background:#FBF1F4">Today</button>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:2px; border:1px solid #F2E9EC; border-radius:14px; overflow:hidden;">
+            <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7"><div style="padding:12px; text-align:center; font-size:12px; font-weight:700; letter-spacing:.6px; color:#8A7A80; background:#FBF5F7;">{{ d }}</div></sc-for>
+            <sc-for list="{{ calDays }}" as="c" hint-placeholder-count="35">
+              <div style="{{ c.cellStyle }}">
+                <span style="{{ c.numStyle }}">{{ c.day }}</span>
+                <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px;">
+                  <sc-for list="{{ c.events }}" as="e" hint-placeholder-count="0"><div style="display:flex; align-items:center; gap:5px; padding:4px 7px; border-radius:7px; background:#FBE9EE; border-left:3px solid var(--accent,#DC2626); overflow:hidden;"><span style="font-weight:800; font-size:11px; color:var(--accent-deep); flex-shrink:0;">{{ e.time }}</span><span style="font-size:11px; color:#6A565C; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ e.name }}</span></div></sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isOverview }}" hint-placeholder-val="">
+        <div style="position:relative; overflow:hidden; border-radius:20px; padding:26px 30px; color:#fff; margin-bottom:18px; background:linear-gradient(115deg,#7F1D2E 0%,#A4163A 52%,#C81E4A 100%); box-shadow:0 14px 36px rgba(150,20,50,.22);">
+          <div style="position:absolute; inset:0; background-image:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.6px); background-size:18px 18px; opacity:.45;"></div>
+          <div style="position:relative; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:20px;">
+            <div><h1 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:25px; margin:0;">Camp's Overview</h1><p style="margin:6px 0 0; font-size:13.5px; color:rgba(255,255,255,.75);">Excluding in-house donations · 01 Jun – 25 Jun 2026</p></div>
+            <div style="display:flex; gap:16px;">
+              <div style="text-align:center; padding:14px 26px; border-radius:16px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);"><div style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:34px; line-height:1;">6</div><div style="font-size:12.5px; color:rgba(255,255,255,.8); margin-top:4px;">Total Camps</div></div>
+              <div style="text-align:center; padding:14px 26px; border-radius:16px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);"><div style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:34px; line-height:1;">125</div><div style="font-size:12.5px; color:rgba(255,255,255,.8); margin-top:4px;">Total Collection</div></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1.6fr 1fr; gap:18px; align-items:start;">
+          <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px 26px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+            <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:19px; margin:0 0 22px;">Collection per Camp</h2>
+            <div style="display:flex; align-items:flex-end; gap:18px; height:220px;">
+              <sc-for list="{{ campBars }}" as="b" hint-placeholder-count="6">
+                <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:9px; height:100%;">
+                  <span style="font-weight:800; font-size:14px; color:#231A1F; font-family:'Bricolage Grotesque',sans-serif;">{{ b.value }}</span>
+                  <div style="{{ b.barStyle }}"></div>
+                  <span style="font-size:11.5px; font-weight:600; color:#8A7A80; text-align:center; line-height:1.25; max-width:80px;">{{ b.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:#fff; border:1px solid #F0E6EA; border-radius:20px; padding:24px; box-shadow:0 1px 2px rgba(31,18,24,.04),0 12px 30px rgba(136,19,55,.05);">
+            <h2 style="font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:18px; margin:0 0 18px;">Collection by Group</h2>
+            <div style="display:flex; align-items:center; gap:20px;">
+              <div style="position:relative; width:140px; height:140px; flex-shrink:0;"><div style="position:absolute; inset:0; border-radius:50%; background:{{ campDonut }};"></div><div style="position:absolute; inset:24px; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center;"><span style="font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:25px;">125</span><span style="font-size:11px; letter-spacing:.5px; color:#9A8C92; font-weight:600;">UNITS</span></div></div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:9px;"><sc-for list="{{ campLegend }}" as="l" hint-placeholder-count="4"><div style="display:flex; align-items:center; gap:9px;"><span style="width:10px; height:10px; border-radius:3px; background:{{ l.color }};"></span><span style="flex:1; font-size:13px; font-weight:600; color:#4A3A40;">{{ l.label }}</span><span style="font-weight:700; font-size:13px;">{{ l.value }}</span></div></sc-for></div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1320, &quot;height&quot;: 900 },
+  &quot;accentColor&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#DC2626&quot;, &quot;options&quot;: [&quot;#DC2626&quot;, &quot;#E11D48&quot;, &quot;#BE123C&quot;], &quot;tsType&quot;: &quot;string&quot; }
+}">
+class Component extends DCLogic {
+  state = {
+    screen: 'home',
+    openMenu: null,
+    centreOpen: false,
+    userOpen: false,
+    stockOpen: false,
+    centre: 'Alaknanda Charitable Blood Centre',
+    topSearch: '',
+    stockType: 'Tested Stock',
+    recTab: 'issue',
+    recSearch: '',
+    recPendingOnly: false,
+    sortCol: 'date',
+    sortDir: 'desc',
+    analyticsTab: 'pi',
+    graphType: 'camp',
+    campTab: 'calendar',
+    piDate: '01/06/26 – 25/06/26'
+  };
+
+  // ---------- helpers ----------
+  donut(segs) {
+    const tot = segs.reduce((a, s) => a + s.value, 0) || 1;
+    let acc = 0; const parts = [];
+    segs.forEach(s => {
+      const a = (acc / tot * 360); const b = ((acc + s.value) / tot * 360);
+      parts.push(`${s.color} ${a.toFixed(2)}deg ${b.toFixed(2)}deg`);
+      acc += s.value;
+    });
+    return `conic-gradient(${parts.join(',')})`;
+  }
+  bar(value, max, grad, w) {
+    const pct = Math.max(value > 0 ? 5 : 1.5, value / max * 100);
+    return `width:100%; max-width:${w || 36}px; height:${pct.toFixed(1)}%; border-radius:8px 8px 4px 4px; background:${grad};`;
+  }
+  spark(arr, close) {
+    const max = Math.max(...arr), min = Math.min(...arr), W = 120, H = 30, P = 2;
+    const pts = arr.map((v, i) => {
+      const x = (i / (arr.length - 1)) * W;
+      const y = P + (max === min ? H / 2 : (1 - (v - min) / (max - min)) * H);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    if (close) return `0,34 ${pts.join(' ')} 120,34`;
+    return pts.join(' ');
+  }
+
+  nav(target) {
+    if (!target) return;
+    const [scr, tab] = target.split(':');
+    const st = { screen: scr, openMenu: null, centreOpen: false, userOpen: false };
+    if (scr === 'analytics' && tab) st.analyticsTab = tab;
+    if (scr === 'camp' && tab) st.campTab = tab;
+    this.setState(st);
+  }
+
+  renderVals() {
+    const accent = this.props.accentColor || '#DC2626';
+    const screen = this.state.screen;
+    const set = (o) => this.setState(o);
+
+    // ---------- NAV ----------
+    const navBtn = (active) =>
+      `display:flex; align-items:center; gap:5px; padding:18px 18px; border:none; background:none; cursor:pointer;`
+      + `font:700 15px 'Plus Jakarta Sans',sans-serif; color:${active ? '#fff' : 'rgba(255,255,255,.74)'};`
+      + `transition:color .15s ease;`;
+    const navDefs = [
+      { key: 'home', label: 'Home', go: 'home', menu: [
+        { t: 'item', label: 'Dashboard', go: 'home' }, { t: 'item', label: 'Accounting' },
+        { t: 'item', label: 'Tools', chev: true }, { t: 'item', label: 'Directory', chev: true },
+        { t: 'item', label: 'Users' }, { t: 'item', label: 'Settings' } ] },
+      { key: 'camp', label: 'Camp', go: 'camp' },
+      { key: 'bloodbag', label: 'Blood Bag', menu: [
+        { t: 'head', label: 'I. Component Preparation' }, { t: 'item', label: 'Bag Entry' },
+        { t: 'item', label: 'Segment Blood Grouping' }, { t: 'item', label: 'Blood Processing' },
+        { t: 'item', label: 'Component Volume' }, { t: 'item', label: 'Validation' },
+        { t: 'head', label: 'II. Grouping' }, { t: 'item', label: 'F/R Grouping' }, { t: 'item', label: 'Validation' },
+        { t: 'head', label: 'III. TTI' }, { t: 'item', label: 'HIV, HBsAG & HCV' }, { t: 'item', label: 'VDRL & MP' },
+        { t: 'item', label: 'Validation' }, { t: 'head', label: 'IV. Shift To Tested Stock' } ] },
+      { key: 'donor', label: 'Donor' },
+      { key: 'qc', label: 'QC' },
+      { key: 'store', label: 'Store' },
+      { key: 'reception', label: 'Reception', go: 'reception', menu: [
+        { t: 'item', label: 'MIS Reports' }, { t: 'item', label: 'Registers' },
+        { t: 'item', label: 'Graphs', chev: true, go: 'analytics:graphs' },
+        { t: 'item', label: 'Performance Indicators', go: 'analytics:pi' },
+        { t: 'item', label: 'Feedbacks' }, { t: 'item', label: 'Donor Recall' } ] },
+      { key: 'analytics', label: 'Analytics', go: 'analytics' }
+    ];
+    const goActive = (g) => {
+      if (!g) return false;
+      const [s, t] = g.split(':');
+      if (s !== screen) return false;
+      if (s === 'analytics' && t) return this.state.analyticsTab === t;
+      return true;
+    };
+    const navItems = navDefs.map(d => {
+      const hasMenu = !!d.menu;
+      const active = (d.go && d.go === screen) || (d.key === 'analytics' && screen === 'analytics') || (d.key === 'reception' && screen === 'reception');
+      const menu = (d.menu || []).map(mi => ({
+        isHead: mi.t === 'head', isItem: mi.t === 'item', label: mi.label, chev: !!mi.chev,
+        marker: mi.t === 'item'
+          ? `width:9px; height:9px; border-radius:50%; flex-shrink:0; border:1.5px solid ${goActive(mi.go) ? accent : '#CBBEC4'}; background:${goActive(mi.go) ? accent : 'transparent'};`
+          : 'display:none;',
+        go: () => { if (mi.go) this.nav(mi.go); else this.setState({ openMenu: null }); }
+      }));
+      return {
+        key: d.key, label: d.label, active, hasMenu,
+        open: this.state.openMenu === d.key && hasMenu,
+        btnStyle: navBtn(active), menu,
+        onClick: () => this.nav(d.go),
+        onEnter: () => this.setState({ openMenu: d.key })
+      };
+    });
+
+    // ---------- TOP BAR ----------
+    const centres = ['Alaknanda Charitable Blood Centre', 'City General Blood Bank', 'Red Cross Society Centre'].map(name => ({
+      name,
+      pick: () => this.setState({ centre: name, centreOpen: false }),
+      style: `display:flex; align-items:center; gap:11px; padding:11px 13px; border-radius:11px; cursor:pointer; font-weight:600; font-size:14px; color:${name === this.state.centre ? accent : '#4A3A40'};`
+        + (name === this.state.centre ? 'background:#FBEEF1;' : ''),
+      dot: `width:8px; height:8px; border-radius:50%; background:${name === this.state.centre ? accent : '#D8CCD1'};`
+    }));
+    const userMenu = ['My Profile', 'Settings', 'Sign out'].map(label => ({
+      label, act: () => this.setState({ userOpen: false })
+    }));
+
+    // ---------- HOME ----------
+    const groups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+    const stockData = [
+      { comp: 'WB', color: '#9F1239', cells: [0, 0, 3, 0, 0, 0, 2, 0] },
+      { comp: 'PLC', color: '#F59E0B', cells: [0, 0, 0, 0, 0, 0, 0, 0] },
+      { comp: 'PRBC', color: '#DC2626', cells: [6, 2, 31, 0, 44, 1, 10, 2] },
+      { comp: 'FFP', color: '#FB7185', cells: [36, 4, 64, 4, 37, 4, 13, 4] }
+    ];
+    const stockRows = stockData.map(r => {
+      const total = r.cells.reduce((a, b) => a + b, 0);
+      return {
+        comp: r.comp, total,
+        tag: `display:inline-block; padding:4px 11px; border-radius:8px; font-weight:700; font-size:13px; color:#fff; background:${r.color};`,
+        cells: r.cells.map(v => ({ v, style: `text-align:right; padding:13px 10px; font-weight:600; color:${v === 0 ? '#C8BCC1' : '#3A2C32'};` }))
+      };
+    });
+    const totalCells = groups.map((_, i) => stockData.reduce((a, r) => a + r.cells[i], 0));
+    const grandTotal = totalCells.reduce((a, b) => a + b, 0);
+    const compSegs = [
+      { label: 'FFP', value: 166, color: '#FB7185' },
+      { label: 'PRBC', value: 96, color: '#DC2626' },
+      { label: 'WB', value: 5, color: '#9F1239' },
+      { label: 'PLC', value: 0, color: '#F59E0B' }
+    ];
+    const compDonut = this.donut(compSegs.filter(s => s.value > 0));
+    const compLegend = compSegs.map(s => ({ label: s.label, value: s.value, color: s.color }));
+    const grMax = Math.max(...totalCells);
+    const groupBars = groups.map((g, i) => ({
+      label: g, value: totalCells[i],
+      barStyle: this.bar(totalCells[i], grMax, 'linear-gradient(180deg,#E11D48,#9F1239)', 40)
+    }));
+    const kpiDefs = [
+      { label: 'Total Units in Stock', value: '267', delta: '+12 this week', tone: 'good', ic: '<path d="M12 2.5C12 2.5 20 11 20 16a8 8 0 0 1-16 0c0-5 8-13.5 8-13.5Z"/>' },
+      { label: 'Expiring in ≤7 days', value: '18', delta: 'Rotate soon', tone: 'warn', ic: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
+      { label: 'Donations Today', value: '32', delta: '+8 vs yesterday', tone: 'good', ic: '<path d="M19 14c1.5-1.5 3-3.4 3-5.5A3.5 3.5 0 0 0 12 6 3.5 3.5 0 0 0 2 8.5C2 10.6 3.5 12.5 5 14l7 7Z"/>' },
+      { label: 'Open Requests', value: '6', delta: '2 pending serology', tone: 'info', ic: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/>' }
+    ];
+    const toneMap = { good: { c: '#15803D', bg: '#DCFCE7' }, warn: { c: '#B45309', bg: '#FEF3C7' }, info: { c: '#1D4ED8', bg: '#DBEAFE' } };
+    const kpis = kpiDefs.map(k => {
+      const tm = toneMap[k.tone];
+      return {
+        label: k.label, value: k.value, delta: k.delta,
+        icon: React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: accent, strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round', dangerouslySetInnerHTML: { __html: k.ic } }),
+        iconWrap: `width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:color-mix(in srgb, ${accent} 12%, transparent);`,
+        deltaStyle: `display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; color:${tm.c}; background:${tm.bg};`
+      };
+    });
+    const workItems = [
+      { label: 'Bag Entry', count: 14, color: '#DC2626' },
+      { label: 'Component Preparation', count: 8, color: '#FB7185' },
+      { label: 'TTI Validation', count: 5, color: '#9F1239' },
+      { label: 'Issued to Patients', count: 6, color: '#F59E0B' }
+    ];
+    const workRing = `conic-gradient(${accent} 0deg ${0.78 * 360}deg, #F3E5EA ${0.78 * 360}deg 360deg)`;
+
+    // ---------- RECEPTION ----------
+    const recData = [
+      { date: '2026-06-24', id: 'ACBC26-R00618', patient: 'Mrs. RUPA', comp: 'PRBC', billing: 'Completed', serology: 'Completed' },
+      { date: '2026-06-24', id: 'ACBC26-R00617', patient: 'Mrs. MONA', comp: 'FFP', billing: 'Completed', serology: 'Completed' },
+      { date: '2026-06-24', id: 'ACBC26-R00616', patient: 'Mrs. GUDIYA', comp: 'PRBC', billing: 'Pending', serology: 'Completed' },
+      { date: '2026-06-24', id: 'ACBC26-R00615', patient: 'Mr. HAR PRAKASH', comp: 'WB', billing: 'Completed', serology: 'Pending' },
+      { date: '2026-06-23', id: 'ACBC26-R00614', patient: 'Mrs. SAHIBA', comp: 'PRBC', billing: 'Completed', serology: 'Completed' },
+      { date: '2026-06-23', id: 'ACBC26-R00613', patient: 'Mrs. TARANNUM', comp: 'FFP', billing: 'Pending', serology: 'Pending' },
+      { date: '2026-06-23', id: 'ACBC26-R00612', patient: 'Mr. RAVI KUMAR', comp: 'PRBC', billing: 'Completed', serology: 'Completed' },
+      { date: '2026-06-22', id: 'ACBC26-R00611', patient: 'Mrs. ANITA DEVI', comp: 'PLC', billing: 'Completed', serology: 'Pending' },
+      { date: '2026-06-22', id: 'ACBC26-R00610', patient: 'Mr. SURESH', comp: 'FFP', billing: 'Completed', serology: 'Completed' }
+    ];
+    const q = this.state.recSearch.trim().toLowerCase();
+    let filtered = recData.filter(r =>
+      (!q || r.patient.toLowerCase().includes(q) || r.id.toLowerCase().includes(q))
+      && (!this.state.recPendingOnly || r.billing === 'Pending' || r.serology === 'Pending'));
+    const dir = this.state.sortDir === 'asc' ? 1 : -1;
+    filtered = filtered.slice().sort((a, b) => {
+      const col = this.state.sortCol;
+      const av = col === 'patient' ? a.patient : a.date + a.id;
+      const bv = col === 'patient' ? b.patient : b.date + b.id;
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+    const pill = (s) => s === 'Completed'
+      ? 'display:inline-block; min-width:104px; padding:8px 0; border-radius:999px; font-weight:700; font-size:13px; color:#15803D; background:#DCFCE7;'
+      : 'display:inline-block; min-width:104px; padding:8px 0; border-radius:999px; font-weight:700; font-size:13px; color:#B45309; background:#FEF3C7;';
+    const compColors = { PRBC: '#DC2626', FFP: '#FB7185', WB: '#9F1239', PLC: '#F59E0B' };
+    const recRows = filtered.map(r => ({
+      date: r.date, id: r.id, patient: r.patient, comp: r.comp,
+      compTag: `display:inline-block; padding:4px 10px; border-radius:7px; font-weight:700; font-size:12.5px; color:${compColors[r.comp]}; background:color-mix(in srgb, ${compColors[r.comp]} 13%, transparent);`,
+      billing: r.billing, serology: r.serology, billStyle: pill(r.billing), seroStyle: pill(r.serology)
+    }));
+    const recTabDefs = [['issue', 'Issue'], ['bulk', 'Bulk Request'], ['fractionation', 'Fractionation'], ['inward', 'Inward Stock']];
+    const recTabStyle = (k) => `padding:14px 18px; border:none; background:none; cursor:pointer; font:700 14.5px 'Plus Jakarta Sans',sans-serif;`
+      + `color:${this.state.recTab === k ? accent : '#9A8C92'}; border-bottom:3px solid ${this.state.recTab === k ? accent : 'transparent'}; margin-bottom:-1px;`;
+    const recTabs = recTabDefs.map(([k, name]) => ({ name, pick: () => set({ recTab: k }), style: recTabStyle(k) }));
+    const tgOn = this.state.recPendingOnly;
+    const toggleTrack = `width:44px; height:25px; border-radius:999px; display:inline-flex; align-items:center; padding:3px; transition:background .18s ease; background:${tgOn ? accent : '#D8CCD1'};`;
+    const toggleKnob = `width:19px; height:19px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:transform .18s ease; transform:translateX(${tgOn ? 19 : 0}px);`;
+    const arrow = (col) => this.state.sortCol === col ? (this.state.sortDir === 'asc' ? '↑' : '↓') : '⇅';
+
+    // ---------- ANALYTICS / PI ----------
+    const piDefs = [
+      { label: 'Transfusion Transmitted Infections', value: '1.49', unit: '%', tone: 'warn', s: [2.1, 1.9, 1.7, 1.8, 1.5, 1.49], st: 'Monitor' },
+      { label: 'Voluntary Blood Donations', value: '100.0', unit: '%', tone: 'good', s: [88, 91, 95, 97, 99, 100], st: 'On target' },
+      { label: 'Outdated WB / Concentrated RBC', value: '0.0', unit: '%', tone: 'good', s: [1.2, 0.8, 0.4, 0.2, 0.1, 0], st: 'On target' },
+      { label: 'Adverse Transfusion Reactions', value: '1.15', unit: '%', tone: 'warn', s: [0.9, 1.0, 1.3, 1.1, 1.2, 1.15], st: 'Monitor' },
+      { label: 'Adverse Donor Reactions', value: '0.0', unit: '%', tone: 'good', s: [0.3, 0.2, 0.1, 0, 0, 0], st: 'On target' },
+      { label: 'Components Prepared From Whole Blood', value: '96.52', unit: '%', tone: 'good', s: [90, 92, 94, 95, 96, 96.5], st: 'On target' },
+      { label: 'TAT of Whole Blood / RBC Issue', value: '35.1', unit: 'mins', tone: 'info', s: [44, 41, 39, 38, 36, 35.1], st: 'Improving' },
+      { label: 'Donor Deferrals', value: '0.0', unit: '%', tone: 'neutral', s: [0, 0, 0, 0, 0, 0], st: 'No data' },
+      { label: 'Quantity Not Sufficient (QNS)', value: '0.0', unit: '%', tone: 'good', s: [0.5, 0.3, 0.2, 0.1, 0, 0], st: 'On target' }
+    ];
+    const piTone = { good: { c: '#15803D', bg: '#DCFCE7' }, warn: { c: '#B45309', bg: '#FEF3C7' }, info: { c: '#1D4ED8', bg: '#DBEAFE' }, neutral: { c: '#8A7A80', bg: '#F1E9EC' } };
+    const piCards = piDefs.map(p => {
+      const tm = piTone[p.tone];
+      return {
+        label: p.label, value: p.value, unit: p.unit, status: p.st,
+        pill: `flex-shrink:0; padding:5px 11px; border-radius:999px; font-size:11.5px; font-weight:700; color:${tm.c}; background:${tm.bg};`,
+        spark: this.spark(p.s, false), area: this.spark(p.s, true),
+        stroke: p.tone === 'warn' ? '#D97706' : p.tone === 'info' ? '#2563EB' : p.tone === 'neutral' ? '#B8A9AF' : accent,
+        fill: p.tone === 'warn' ? '#D97706' : p.tone === 'info' ? '#2563EB' : accent
+      };
+    });
+    const anTabDefs = [['pi', 'Performance Indicators'], ['graphs', 'Graphs']];
+    const anTabStyle = (k) => `padding:10px 18px; border-radius:10px; border:none; cursor:pointer; font:700 14px 'Plus Jakarta Sans',sans-serif;`
+      + `color:${this.state.analyticsTab === k ? 'var(--accent-deep)' : 'rgba(255,255,255,.85)'}; background:${this.state.analyticsTab === k ? '#fff' : 'rgba(255,255,255,.12)'};`;
+    const anTabs = anTabDefs.map(([k, name]) => ({ name, pick: () => set({ analyticsTab: k }), style: anTabStyle(k) }));
+
+    // ---------- GRAPHS ----------
+    const graphDatasets = {
+      camp: { title: 'Collection per Camp', sub: 'Units collected across 6 camps this month', bars: [['Mahaveer Farm', 28], ['Income Tax Office', 22], ['Village Dahaur', 31], ['Prathmik Vidyalay', 14], ['Village Madkarimpur', 18], ['Civil Lines', 12]] },
+      donor: { title: 'Donors by Age Band', sub: 'Donor distribution by age group', bars: [['18–24', 24], ['25–34', 38], ['35–44', 31], ['45–54', 19], ['55–64', 9], ['65+', 4]] },
+      reception: { title: 'Requests per Day', sub: 'Issue requests received over the last week', bars: [['Mon', 8], ['Tue', 12], ['Wed', 9], ['Thu', 14], ['Fri', 11], ['Sat', 7]] }
+    };
+    const graphOptDefs = ['Accounting', 'Camp', 'Blood Bags', 'Donor', 'Deferred Donor', 'Reception', 'TTI'];
+    const keyFor = (n) => n === 'Camp' ? 'camp' : n === 'Donor' ? 'donor' : n === 'Reception' ? 'reception' : 'camp';
+    const graphOpts = graphOptDefs.map(n => {
+      const k = keyFor(n);
+      const active = this.state.graphType === k && (['Camp', 'Donor', 'Reception'].includes(n) ? n.toLowerCase() === this.state.graphSel || true : true);
+      const isSel = (n === 'Camp' && this.state.graphType === 'camp') || (n === 'Donor' && this.state.graphType === 'donor') || (n === 'Reception' && this.state.graphType === 'reception');
+      return {
+        name: n, pick: () => set({ graphType: keyFor(n) }),
+        style: `display:flex; align-items:center; gap:11px; padding:11px 13px; border-radius:11px; cursor:pointer; font-weight:600; font-size:14px; color:${isSel ? accent : '#5A4A50'}; background:${isSel ? '#FBEEF1' : 'transparent'};`,
+        marker: `width:9px; height:9px; border-radius:50%; flex-shrink:0; border:1.5px solid ${isSel ? accent : '#CBBEC4'}; background:${isSel ? accent : 'transparent'};`
+      };
+    });
+    const gd = graphDatasets[this.state.graphType] || graphDatasets.camp;
+    const gMax = Math.max(...gd.bars.map(b => b[1]));
+    const graphBars = gd.bars.map(b => ({ label: b[0], value: b[1], barStyle: this.bar(b[1], gMax, 'linear-gradient(180deg,#FB7185,#DC2626)', 52) }));
+    const grpSegs = [
+      { label: 'O+ / O-', value: 44, color: '#DC2626' },
+      { label: 'B+ / B-', value: 34, color: '#FB7185' },
+      { label: 'A+ / A-', value: 30, color: '#9F1239' },
+      { label: 'AB+ / AB-', value: 17, color: '#F59E0B' }
+    ];
+
+    // ---------- CAMP / CALENDAR ----------
+    const events = {
+      3: [{ time: '9a', name: 'PRATHMIK VIDYALAY' }],
+      7: [{ time: '11a', name: 'MAHAVEER FARM BALAJI' }],
+      14: [{ time: '10a', name: 'INCOME TAX OFFICE' }, { time: '12p', name: 'VILLAGE DAHAUR KHAT' }],
+      21: [{ time: '10a', name: 'VILLAGE MADKARIMPUR' }],
+      23: [{ time: '9a', name: 'CIVIL LINES SOUTH' }]
+    };
+    const calDays = [];
+    for (let i = 0; i < 35; i++) {
+      const day = i - 0 + 1; // June 1 2026 is Monday -> index 0 = day 1
+      const inMonth = day >= 1 && day <= 30;
+      const today = day === 25 && inMonth;
+      calDays.push({
+        day: inMonth ? day : (day > 30 ? day - 30 : ''),
+        events: inMonth ? (events[day] || []) : [],
+        cellStyle: `min-height:104px; padding:9px 9px 8px; background:${today ? '#FBEEF1' : '#fff'}; ${!inMonth ? 'background:#FAF6F8; opacity:.55;' : ''} display:flex; flex-direction:column;`,
+        numStyle: `font-weight:${today ? 800 : 600}; font-size:13.5px; color:${today ? accent : (inMonth ? '#3A2C32' : '#C8BCC1')}; ${today ? `width:25px; height:25px; border-radius:50%; background:color-mix(in srgb, ${accent} 16%, transparent); display:flex; align-items:center; justify-content:center;` : ''}`
+      });
+    }
+    const campTabDefs = [['calendar', 'Calendar'], ['overview', 'Overview']];
+    const campTabStyle = (k) => `padding:10px 20px; border-radius:10px; border:none; cursor:pointer; font:700 14px 'Plus Jakarta Sans',sans-serif;`
+      + `color:${this.state.campTab === k ? '#fff' : '#8A7A80'}; background:${this.state.campTab === k ? accent : 'transparent'};`;
+    const campTabs = campTabDefs.map(([k, name]) => ({ name, pick: () => set({ campTab: k }), style: campTabStyle(k) }));
+    const campBarData = [['Mahaveer Farm', 28], ['Income Tax', 22], ['Village Dahaur', 31], ['Prathmik V.', 14], ['Madkarimpur', 18], ['Civil Lines', 12]];
+    const cbMax = Math.max(...campBarData.map(b => b[1]));
+    const campBars = campBarData.map(b => ({ label: b[0], value: b[1], barStyle: this.bar(b[1], cbMax, 'linear-gradient(180deg,#FB7185,#9F1239)', 50) }));
+    const campSegs = [
+      { label: 'O+ / O-', value: 46, color: '#DC2626' },
+      { label: 'B+ / B-', value: 35, color: '#FB7185' },
+      { label: 'A+ / A-', value: 28, color: '#9F1239' },
+      { label: 'AB+ / AB-', value: 16, color: '#F59E0B' }
+    ];
+    // trend
+    const trendVals = [60, 95, 80, 120, 88, 125];
+    const tMax = Math.max(...trendVals), tMin = 40;
+    const tPts = trendVals.map((v, i) => {
+      const x = 12 + (i / 5) * 276;
+      const y = 130 - ((v - tMin) / (tMax - tMin)) * 110;
+      return { x: x.toFixed(1), y: y.toFixed(1) };
+    });
+    const trendLine = tPts.map(p => `${p.x},${p.y}`).join(' ');
+    const trendArea = `12,130 ${trendLine} 288,130`;
+
+    return {
+      accent, navItems,
+      centre: this.state.centre, centres, centreOpen: this.state.centreOpen,
+      userOpen: this.state.userOpen, userMenu,
+      topSearch: this.state.topSearch, setTopSearch: (e) => set({ topSearch: e.target.value }),
+      toggleCentre: () => set({ centreOpen: !this.state.centreOpen, userOpen: false }),
+      toggleUser: () => set({ userOpen: !this.state.userOpen, centreOpen: false }),
+      backdropOn: this.state.centreOpen || this.state.userOpen || this.state.stockOpen,
+      closeAll: () => set({ centreOpen: false, userOpen: false, stockOpen: false }),
+      leaveMenu: () => set({ openMenu: null }),
+      goHome: () => this.nav('home'), goReception: () => this.nav('reception'),
+      isHome: screen === 'home', isReception: screen === 'reception',
+      isAnalytics: screen === 'analytics', isCamp: screen === 'camp',
+      // home
+      groups, stockRows, totalCells, grandTotal, compDonut, compLegend, groupBars, kpis, workItems, workRing, workPct: '78%',
+      stockType: this.state.stockType, stockOpen: this.state.stockOpen,
+      toggleStock: () => set({ stockOpen: !this.state.stockOpen }),
+      stockTypes: ['Tested Stock', 'Untested Stock', 'Reserved'].map(name => ({
+        name, pick: () => set({ stockType: name, stockOpen: false }),
+        style: `padding:10px 13px; border-radius:10px; cursor:pointer; font-weight:600; font-size:13.5px; color:${name === this.state.stockType ? accent : '#4A3A40'}; ${name === this.state.stockType ? 'background:#FBEEF1;' : ''}`
+      })),
+      // reception
+      recTabs, recRows, recEmpty: recRows.length === 0,
+      recSearch: this.state.recSearch, setRecSearch: (e) => set({ recSearch: e.target.value }),
+      togglePending: () => set({ recPendingOnly: !this.state.recPendingOnly }),
+      toggleTrack, toggleKnob,
+      sortDate: () => set({ sortCol: 'date', sortDir: this.state.sortCol === 'date' && this.state.sortDir === 'desc' ? 'asc' : 'desc' }),
+      sortPatient: () => set({ sortCol: 'patient', sortDir: this.state.sortCol === 'patient' && this.state.sortDir === 'asc' ? 'desc' : 'asc' }),
+      dateArrow: arrow('date'), patientArrow: arrow('patient'),
+      recCount: `Showing ${recRows.length} of ${recData.length} requests`,
+      // analytics
+      piDate: this.state.piDate, anTabs, isPI: this.state.analyticsTab === 'pi', isGraphs: this.state.analyticsTab === 'graphs', piCards,
+      graphOpts, graphTitle: gd.title, graphSub: gd.sub, graphBars,
+      graphDonut: this.donut(grpSegs), graphDonutTotal: grpSegs.reduce((a, s) => a + s.value, 0),
+      graphLegend: grpSegs,
+      trendLine, trendArea, trendDots: tPts, trendLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+      // camp
+      campTabs, isCalendar: this.state.campTab === 'calendar', isOverview: this.state.campTab === 'overview',
+      weekDays: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'], calDays,
+      campBars, campDonut: this.donut(campSegs), campLegend: campSegs
+    };
+  }
+}
+</script>
+</body>
+</html>
