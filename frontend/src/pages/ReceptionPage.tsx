@@ -54,6 +54,7 @@ export function ReceptionPage() {
   const [sortCol, setSortCol] = useState<"date" | "patient_name">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
+  const [xmatchReq, setXmatchReq] = useState<any>(null);
   const pageSize = 10;
 
   const { data } = useQuery({
@@ -88,6 +89,26 @@ export function ReceptionPage() {
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (e: any) => setNotice(e?.response?.data?.detail ?? "Could not update serology."),
+  });
+
+  // Record a crossmatch result before the unit may be issued. A compatible result
+  // immediately carries the request forward to issue; an incompatible one blocks it.
+  const recordCrossmatch = useMutation({
+    mutationFn: async (p: { id: string; result: "compatible" | "incompatible" }) =>
+      (await api.post("/reception/crossmatch", { request_id: p.id, result: p.result })).data,
+    onSuccess: (d, p) => {
+      setXmatchReq(null);
+      if (p.result === "compatible") {
+        advanceSerology.mutate(p.id);
+      } else {
+        setNotice(`Crossmatch incompatible for ${d.request_id} — this unit cannot be issued.`);
+        qc.invalidateQueries({ queryKey: ["reception"] });
+      }
+    },
+    onError: (e: any) => {
+      setXmatchReq(null);
+      setNotice(e?.response?.data?.detail ?? "Could not record crossmatch.");
+    },
   });
 
   function sort(col: "date" | "patient_name") {
@@ -125,6 +146,34 @@ export function ReceptionPage() {
 
       <InventoryModal open={invOpen} onClose={() => setInvOpen(false)} />
       <HistoryModal open={histOpen} onClose={() => setHistOpen(false)} />
+
+      <Modal open={!!xmatchReq} onClose={() => setXmatchReq(null)} title="Record Crossmatch">
+        {xmatchReq && (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-3">
+              Record the crossmatch outcome for <span className="font-bold text-accent">{xmatchReq.request_id}</span>
+              {xmatchReq.blood_group ? <> ({xmatchReq.blood_group} {xmatchReq.component})</> : null}. A unit can only
+              be issued once the crossmatch is found compatible.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => recordCrossmatch.mutate({ id: xmatchReq.id, result: "incompatible" })}
+                disabled={recordCrossmatch.isPending}
+                className="rounded-btn border border-accent/40 px-4 py-2 text-sm font-bold text-accent hover:bg-accent/5 disabled:opacity-50"
+              >
+                Incompatible
+              </button>
+              <button
+                onClick={() => recordCrossmatch.mutate({ id: xmatchReq.id, result: "compatible" })}
+                disabled={recordCrossmatch.isPending}
+                className="rounded-btn bg-success px-4 py-2 text-sm font-bold text-white hover:brightness-105 disabled:opacity-50"
+              >
+                Compatible — Proceed to Issue
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <EntityForm
         open={addOpen}
@@ -217,9 +266,10 @@ export function ReceptionPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              advanceSerology.mutate(r.id);
+                              if (stage === "crossmatch") setXmatchReq(r);
+                              else advanceSerology.mutate(r.id);
                             }}
-                            disabled={advanceSerology.isPending}
+                            disabled={advanceSerology.isPending || recordCrossmatch.isPending}
                             className="min-w-[104px] rounded-full bg-amber-400 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:brightness-105 disabled:opacity-50"
                           >
                             {SEROLOGY_LABELS[stage]}

@@ -24,6 +24,11 @@ class BloodRequest(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, B
     serology_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     # Serology workflow stage while serology is pending: grouping → crossmatch → issue → done
     serology_stage: Mapped[str] = mapped_column(String(20), default="grouping", nullable=False)
+    # Crossmatch outcome recorded before a unit may be issued: compatible | incompatible.
+    # NULL means no crossmatch has been performed yet.
+    crossmatch_result: Mapped[str | None] = mapped_column(String(20))
+    crossmatch_unit_id: Mapped[str | None] = mapped_column(String(60))
+    crossmatch_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     issued_component_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
 
@@ -81,7 +86,10 @@ class Feedback(UUIDMixin, TimestampMixin, OrgScopedMixin, Base):
     staff_behaviour: Mapped[int] = mapped_column(Integer, default=0)
     would_recommend: Mapped[int] = mapped_column(Integer, default=0)
     date: Mapped[date | None] = mapped_column(Date)
+    name: Mapped[str | None] = mapped_column(String(200))
+    contact: Mapped[str | None] = mapped_column(String(40))
     comment: Mapped[str | None] = mapped_column(Text)
+    action_taken: Mapped[str | None] = mapped_column(Text)
 
 
 class CustomReport(UUIDMixin, TimestampMixin, OrgScopedMixin, Base):

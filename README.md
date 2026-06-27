@@ -75,6 +75,45 @@ npm install
 VITE_API_URL=http://localhost:8000 npm run dev
 ```
 
+## Deployment
+
+Production uses the **same `docker-compose.yml`** but with no dev-convenience
+fallbacks — every variable must be supplied explicitly. Both compose (via `:?`
+guards) and the API (`Settings.validate_runtime`) **fail fast** if anything
+required is missing, so a misconfigured deploy never boots.
+
+```bash
+cp .env.production.example .env   # then fill in EVERY value
+docker compose up --build -d
+```
+
+### Checklist
+
+- [ ] **Copy the template:** `cp .env.production.example .env` and fill in every
+  variable — there are no defaults (see the file for what each one means).
+- [ ] **Strong DB credentials:** unique `POSTGRES_USER` / `POSTGRES_PASSWORD` /
+  `POSTGRES_DB`; never reuse the example values.
+- [ ] **`DATABASE_URL` matches** the `POSTGRES_*` values and points at the `db`
+  host (`...@db:5432/...`).
+- [ ] **Real `JWT_SECRET`:** `openssl rand -hex 32`. The app rejects a blank value
+  and the `dev-secret-change-me` placeholder.
+- [ ] **`CORS_ORIGINS`** set to the exact public frontend URL(s) — no localhost.
+- [ ] **`VITE_API_URL`** set to the public API URL — no localhost. (It is baked
+  into the built frontend, so set it before building.)
+- [ ] **`SEED_ON_START=false`** — `true` wipes & reseeds synthetic data on every
+  boot and will destroy real data.
+- [ ] **`LOG_JSON=true`** (structured logs for your collector) and `LOG_LEVEL=INFO`.
+- [ ] **Secrets stay secret:** keep `.env` out of version control and out of
+  images; rotate `JWT_SECRET` / DB credentials per your policy.
+- [ ] **Migrations run:** the api container runs `alembic upgrade head` on start —
+  confirm it succeeds in the logs before serving traffic.
+- [ ] **TLS / reverse proxy:** terminate HTTPS in front of the `web` and `api`
+  ports (8000 / 5173); they are plain HTTP inside the compose network.
+
+> The dev quick start above intentionally uses `.env.example`, which ships
+> localhost values and `SEED_ON_START=true` for convenience. Do **not** use it in
+> production.
+
 ## Screens
 
 The four hero screens are built pixel-faithfully to the design handoff (crimson/rose
@@ -183,5 +222,5 @@ NABH · NBTC · Drugs & Cosmetics Act 1940 · e-Rakt-Kosh compatible labels are 
 backend/   FastAPI app (core, db, models, schemas, api/v1, services, seeds) + alembic + tests/
 frontend/  Vite React app (lib, components, pages) + Tailwind crimson token layer
 docs/      DESIGN_HANDOFF.md + design-reference/ (original .dc.html prototype, reference only)
-docker-compose.yml · .env.example
+docker-compose.yml · .env.example (dev) · .env.production.example (deploy)
 ```

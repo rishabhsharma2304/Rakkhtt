@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Droplet, HeartPulse, Plus, UserPlus, Users } from "lucide-react";
 import { DataTable, type Column, type CrudConfig, type Field } from "@/components/DataTable";
@@ -98,6 +99,7 @@ function useCount(path: string, params: Record<string, unknown>, key: string) {
 
 // ---------------- donation tab table (donor/camp names resolved) ----------------
 function DonationTable({ status }: { status: string }) {
+  const navigate = useNavigate();
   const { data: donorData } = useQuery({
     queryKey: ["lookup", "/donors"],
     queryFn: () => fetchList("/donors", { page_size: 500 }),
@@ -172,6 +174,7 @@ function DonationTable({ status }: { status: string }) {
       defaultSort="date"
       emptyMessage={`No ${status} donations.`}
       crud={donationCrud}
+      onRowClick={(row) => row.donor_id && navigate(`/donor/${row.donor_id}`)}
     />
   );
 }
@@ -217,6 +220,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export function DonorsPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("pending");
   const [adding, setAdding] = useState<null | "donor" | "donation">(null);
 
@@ -263,6 +267,7 @@ export function DonorsPage() {
             emptyMessage="No donors available."
             crud={donorCrud}
             filterFields={donorFilters}
+            onRowClick={(row) => navigate(`/donor/${row.id}`)}
           />
         ) : (
           <DonationTable key={tab} status={tab} />

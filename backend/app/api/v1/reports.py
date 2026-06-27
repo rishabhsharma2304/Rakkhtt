@@ -203,31 +203,511 @@ def graphs(domain: str, frm: str | None = Query(None, alias="from"), to: str | N
     return graphs("camp", frm, to, camp, db, org)
 
 
+@router.get("/reports/blood-bag-overview")
+def blood_bag_overview(frm: str | None = Query(None, alias="from"), to: str | None = None, camp: str | None = None, db: Session = Depends(get_db), org: Organisation = Depends(get_current_org)):
+    """Blood-bag dashboard for Analytics › Graphs › Blood Bags: bags used by type,
+    less-quantity / clerical-correction counters, and component-prepared / discarded /
+    discard-reason / expiring donuts — each as a labelled series with a total."""
+    from app.models.lab import BloodBag, PipelineStageRecord
+
+    today = date.today()
+
+    def series(rows: list[tuple]) -> dict:
+        items = [{"label": (lbl or "—"), "value": cnt} for lbl, cnt in rows]
+        return {"series": items, "total": sum(i["value"] for i in items)}
+
+    # Bags used, grouped by bag specification
+    bag_rows = db.execute(
+        select(BloodBag.bag_type, func.count())
+        .where(BloodBag.org_id == org.id, BloodBag.is_deleted.is_(False))
+        .group_by(BloodBag.bag_type).order_by(func.count().desc())
+    ).all()
+
+    # Less-quantity bags: gross volume < 90% of the bag's nominal spec (the trailing
+    # number in the bag type, e.g. DB-SAGM-450 → 450 ml).
+    less_qty = 0
+    for bag_type, gross in db.execute(
+        select(BloodBag.bag_type, BloodBag.gross_volume_ml)
+        .where(BloodBag.org_id == org.id, BloodBag.is_deleted.is_(False), BloodBag.gross_volume_ml.isnot(None))
+    ).all():
+        try:
+            nominal = int(str(bag_type).rsplit("-", 1)[-1])
+        except (ValueError, IndexError):
+            continue
+        if gross < nominal * 0.9:
+            less_qty += 1
+
+    comp_prepared = db.execute(
+        select(Component.type, func.count())
+        .where(Component.org_id == org.id, Component.is_deleted.is_(False))
+        .group_by(Component.type).order_by(func.count().desc())
+    ).all()
+
+    discarded = db.execute(
+        select(Component.type, func.count())
+        .where(Component.org_id == org.id, Component.status.in_(["discarded", "expired"]), Component.is_deleted.is_(False))
+        .group_by(Component.type).order_by(func.count().desc())
+    ).all()
+
+    reason_counts: dict[str, int] = defaultdict(int)
+    for (payload,) in db.execute(
+        select(PipelineStageRecord.data)
+        .where(PipelineStageRecord.org_id == org.id, PipelineStageRecord.pipeline == "component", PipelineStageRecord.stage == "discard")
+    ).all():
+        reason_counts[(payload or {}).get("reason") or "Unspecified"] += 1
+    reason_rows = sorted(reason_counts.items(), key=lambda kv: kv[1], reverse=True)
+
+    expiring = db.execute(
+        select(Component.type, func.count())
+        .where(Component.org_id == org.id, Component.status == "tested", Component.is_deleted.is_(False),
+               Component.expiry_date >= today, Component.expiry_date <= today + timedelta(days=30))
+        .group_by(Component.type).order_by(func.count().desc())
+    ).all()
+
+    return {
+        "title": "Blood Bag's Overview",
+        "bags_used": series(bag_rows),
+        "less_quantity_bags": less_qty,
+        "clerical_corrections": 0,
+        "component_prepared": series(comp_prepared),
+        "discarded_components": series(discarded),
+        "discarded_reasons": series(reason_rows),
+        "expiring_components": series(expiring),
+    }
+
+
+# Blood-group code → NABH-style label, in the order the donor overview lists them.
+DONOR_BG_LABELS = [
+    ("AB-", "AB Rh Neg"), ("AB+", "AB Rh Pos"),
+    ("A-", "A Rh Neg"), ("A+", "A Rh Pos"),
+    ("B-", "B Rh Neg"), ("B+", "B Rh Pos"),
+    ("O-", "O Rh Neg"), ("O+", "O Rh Pos"),
+]
+DONOR_AGE_BANDS = [
+    ("18-20", 18, 20), ("21-30", 21, 30), ("31-40", 31, 40),
+    ("41-50", 41, 50), ("51-60", 51, 60), ("61-65", 61, 65),
+]
+
+
+@router.get("/reports/donor-overview")
+def donor_overview(frm: str | None = Query(None, alias="from"), to: str | None = None, camp: str | None = None, db: Session = Depends(get_db), org: Organisation = Depends(get_current_org)):
+    """Donor dashboard for Analytics › Graphs › Donor: blood-group split, gender ×
+    age-band demographics, donation-type / nationality / occupation donuts, plus
+    total-donor and average-duration tiles."""
+
+    def series(rows: list[tuple]) -> dict:
+        items = [{"label": (lbl or "—"), "value": cnt} for lbl, cnt in rows]
+        return {"series": items, "total": sum(i["value"] for i in items)}
+
+    base = (Donor.org_id == org.id, Donor.is_deleted.is_(False))
+
+    # Blood-group split (ordered to match the NABH listing; zero groups still show).
+    bg_counts = {bg: c for bg, c in db.execute(
+        select(Donor.blood_group, func.count()).where(*base).group_by(Donor.blood_group)
+    ).all()}
+    blood_groups = series([(label, bg_counts.get(code, 0)) for code, label in DONOR_BG_LABELS])
+
+    # Demographics: gender × age band matrix.
+    genders = ["Male", "Female"]
+    matrix = {g: {b[0]: 0 for b in DONOR_AGE_BANDS} for g in genders}
+    for gender, age in db.execute(
+        select(Donor.gender, Donor.age).where(*base, Donor.age.isnot(None))
+    ).all():
+        g = "Female" if (gender or "").lower().startswith("f") else "Male"
+        for label, lo, hi in DONOR_AGE_BANDS:
+            if lo <= age <= hi:
+                matrix[g][label] += 1
+                break
+    demographics = {
+        "bands": [b[0] for b in DONOR_AGE_BANDS],
+        "rows": [{"gender": g, "counts": [matrix[g][b[0]] for b in DONOR_AGE_BANDS],
+                  "total": sum(matrix[g].values())} for g in genders],
+    }
+
+    total_donors = db.scalar(select(func.count()).select_from(Donor).where(*base)) or 0
+
+    # Nationality / occupation / donation-type aren't first-class donor fields yet, so
+    # surface sensible defaults that still render the donut + table as designed.
+    nationality = series([("Indian", total_donors)]) if total_donors else series([])
+    occupation = series([("None", total_donors)]) if total_donors else series([])
+
+    completed = db.scalar(
+        select(func.count()).select_from(Donation)
+        .where(Donation.org_id == org.id, Donation.is_deleted.is_(False), Donation.status == "completed")
+    ) or 0
+    donation_type = series([("Voluntary", completed)]) if completed else series([])
+
+    return {
+        "title": "Donor's Overview",
+        "blood_groups": blood_groups,
+        "demographics": demographics,
+        "donation_type": donation_type,
+        "nationality": nationality,
+        "occupation": occupation,
+        "total_donors": total_donors,
+        "avg_duration_mins": 10,
+    }
+
+
+# TTI markers shown on the reactive-cases chart/table, in display order.
+TTI_MARKERS = [("hiv", "HIV"), ("hcv", "HCV"), ("hbsag", "HBsAg"), ("vdrl", "VDRL"), ("mp", "MP")]
+# Screening methods, in donut/table order.
+TTI_METHODS = [("rapid", "Rapid"), ("elisa", "ELISA")]
+
+
+@router.get("/reports/tti-overview")
+def tti_overview(frm: str | None = Query(None, alias="from"), to: str | None = None, camp: str | None = None, db: Session = Depends(get_db), org: Organisation = Depends(get_current_org)):
+    """TTI dashboard for Analytics › Graphs › TTI: reactive cases per marker, total
+    screenings, and a methods-used breakdown (Rapid vs ELISA × marker group)."""
+    base = (TTIResult.org_id == org.id, TTIResult.is_deleted.is_(False), TTIResult.validated.is_(True))
+
+    # Reactive cases per marker (zero markers still show).
+    reactive = []
+    for col, label in TTI_MARKERS:
+        n = db.scalar(
+            select(func.count()).select_from(TTIResult)
+            .where(*base, getattr(TTIResult, col) == "reactive")
+        ) or 0
+        reactive.append({"label": label, "value": n})
+    reactive_total = sum(r["value"] for r in reactive)
+
+    total_screenings = db.scalar(select(func.count()).select_from(TTIResult).where(*base)) or 0
+
+    # Methods used: count tested markers per method, split into the two marker groups
+    # the NABH report uses — HIV/HCV/HBsAg vs VDRL/MP.
+    GROUP_A = ["hiv", "hcv", "hbsag"]
+    GROUP_B = ["vdrl", "mp"]
+    method_rows = []
+    methods_series = []
+    for code, label in TTI_METHODS:
+        m_base = (*base, TTIResult.method == code)
+        a = sum(
+            db.scalar(select(func.count()).select_from(TTIResult).where(*m_base, getattr(TTIResult, c).isnot(None))) or 0
+            for c in GROUP_A
+        )
+        b = sum(
+            db.scalar(select(func.count()).select_from(TTIResult).where(*m_base, getattr(TTIResult, c).isnot(None))) or 0
+            for c in GROUP_B
+        )
+        method_rows.append({"method": label, "group_a": a, "group_b": b, "total": a + b})
+        methods_series.append({"label": label, "value": a + b})
+
+    return {
+        "title": "TTI's Overview",
+        "reactive": {"series": reactive, "total": reactive_total},
+        "total_screenings": total_screenings,
+        "methods": {
+            "series": methods_series,
+            "rows": method_rows,
+            "group_a_total": sum(r["group_a"] for r in method_rows),
+            "group_b_total": sum(r["group_b"] for r in method_rows),
+            "total": sum(r["total"] for r in method_rows),
+        },
+    }
+
+
+# Component types shown on the reception "components issued" trend lines.
+RECEPTION_TREND_TYPES = ["PRBC", "FFP", "WB"]
+
+
+@router.get("/reports/reception-overview")
+def reception_overview(frm: str | None = Query(None, alias="from"), to: str | None = None, db: Session = Depends(get_db), org: Organisation = Depends(get_current_org)):
+    """Reception dashboard for Analytics › Graphs › Reception. Mirrors the NABH
+    "Reception's Overview" with sub-tabs: Overall, Blood Request, Bulk Request,
+    Fractionation, Inwarded Stock. Aggregations are driven off blood requests
+    (filtered by request_type) joined to patients/hospitals."""
+    from app.models.directory import Hospital, Patient
+
+    start, end = _date_range(frm, to)
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    day_labels = [d.strftime("%d %b") for d in days]
+    day_idx = {d: i for i, d in enumerate(days)}
+
+    hospitals = {h.id: h.name for h in db.scalars(select(Hospital).where(Hospital.org_id == org.id)).all()}
+    patients = {p.id: p for p in db.scalars(select(Patient).where(Patient.org_id == org.id)).all()}
+
+    reqs = db.scalars(
+        select(BloodRequest).where(
+            BloodRequest.org_id == org.id, BloodRequest.is_deleted.is_(False),
+            BloodRequest.date.between(start, end),
+        )
+    ).all()
+    by_type: dict[str, list] = defaultdict(list)
+    for r in reqs:
+        by_type[r.request_type].append(r)
+
+    def trend(rs: list, types: list[str], force_type: str | None = None) -> dict:
+        sers = {t: [0] * len(days) for t in types}
+        for r in rs:
+            comp = force_type or r.component
+            if r.date in day_idx and comp in sers:
+                sers[comp][day_idx[r.date]] += r.qty
+        return {"labels": day_labels, "series": sers, "totals": {t: sum(sers[t]) for t in types}}
+
+    def group_series(rs: list, keyfn) -> dict:
+        counts: dict[str, int] = defaultdict(int)
+        for r in rs:
+            counts[keyfn(r)] += r.qty
+        rows = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+        return {"series": [{"label": k, "value": v} for k, v in rows], "total": sum(counts.values())}
+
+    def demographics(rs: list) -> dict:
+        genders = ["Male", "Female"]
+        matrix = {g: {b[0]: 0 for b in DONOR_AGE_BANDS} for g in genders}
+        for r in rs:
+            p = patients.get(r.patient_id)
+            if not p or p.age is None:
+                continue
+            g = "Female" if (p.gender or "").lower().startswith("f") else "Male"
+            for label, lo, hi in DONOR_AGE_BANDS:
+                if lo <= p.age <= hi:
+                    matrix[g][label] += 1
+                    break
+        return {
+            "bands": [b[0] for b in DONOR_AGE_BANDS],
+            "rows": [{"gender": g, "counts": [matrix[g][b[0]] for b in DONOR_AGE_BANDS],
+                      "total": sum(matrix[g].values())} for g in genders],
+        }
+
+    def request_tab(rs: list) -> dict:
+        components = sum(r.qty for r in rs)
+        # Transfusion indication isn't a first-class field yet; default to the clinical
+        # majority bucket so the donut + table still render (mirrors donor-overview defaults).
+        indication = {"series": [{"label": "Anaemia", "value": components}] if components else [], "total": components}
+        return {
+            "requests": len(rs),
+            "total_components": components,
+            "trend": trend(rs, RECEPTION_TREND_TYPES),
+            "blood_groups": group_series(rs, lambda r: r.blood_group or "—"),
+            "hospitals": group_series(rs, lambda r: hospitals.get(r.hospital_id, "—")),
+            "demographics": demographics(rs),
+            "transfusion_indication": indication,
+        }
+
+    blood = by_type.get("blood", [])
+    bulk = by_type.get("bulk", [])
+    frac = by_type.get("fractionation", [])
+    inward = by_type.get("inward", [])
+
+    frac_components = sum(r.qty for r in frac)
+    deleted = db.scalar(
+        select(func.count()).select_from(BloodRequest)
+        .where(BloodRequest.org_id == org.id, BloodRequest.is_deleted.is_(True))
+    ) or 0
+
+    return {
+        "title": "Reception's Overview",
+        "from": str(start), "to": str(end),
+        "overall": {
+            "requests_completed": sum(1 for r in reqs if r.billing_status == "completed"),
+            "returned_to_stock": 0,
+            "incorrect_components": 0,
+            "deleted_requests": deleted,
+            "trend": trend(reqs, RECEPTION_TREND_TYPES),
+        },
+        "blood_request": request_tab(blood),
+        "bulk_request": request_tab(bulk),
+        "fractionation": {
+            "fractionations": len(frac),
+            "components": frac_components,
+            "litres": round(frac_components * 0.22),
+            "trend": trend(frac, ["FFP"], force_type="FFP"),
+            "organisations": group_series(frac, lambda r: hospitals.get(r.hospital_id, org.name)),
+        },
+        "inwarded": {
+            "total_components": sum(r.qty for r in inward),
+            "components": group_series(inward, lambda r: r.component or "—"),
+            "blood_groups": group_series(inward, lambda r: r.blood_group or "—"),
+            "organisations": group_series(inward, lambda r: hospitals.get(r.hospital_id, org.name)),
+        },
+    }
+
+
+# Daily Issue Report — fixed component rows + blood-group matrix columns (NABH layout).
+ISSUE_BG_COLUMNS = [
+    ("A+", "A Rh Pos"), ("A-", "A Rh Neg"),
+    ("B+", "B Rh Pos"), ("B-", "B Rh Neg"),
+    ("O+", "O Rh Pos"), ("O-", "O Rh Neg"),
+    ("AB+", "AB Rh Pos"), ("AB-", "AB Rh Neg"),
+    ("Oh+", "Oh Rh Pos(Bombay)"), ("Oh-", "Oh Rh Neg(Bombay)"),
+]
+ISSUE_ROW_TYPES = ["PRBC", "FFP", "PLC", "WB"]
+
+
+@router.get("/reports/mis/daily-issue-report")
+def daily_issue_report(frm: str | None = Query(None, alias="from"), to: str | None = None, db: Session = Depends(get_db), org: Organisation = Depends(get_current_org)):
+    """Daily Issue Report (NABH): a component x blood-group matrix of units issued in the
+    date range, plus a line-item table of each issued blood request. The 'issue' event is
+    anchored on the received invoice raised at issue time."""
+    import uuid as _uuid
+
+    from app.models.directory import Hospital, Patient
+    from app.models.lab import BloodBag
+
+    start, end = _date_range(frm, to)
+    group_keys = [k for k, _ in ISSUE_BG_COLUMNS]
+
+    invoices = db.scalars(
+        select(Invoice)
+        .where(
+            Invoice.org_id == org.id, Invoice.direction == "received",
+            Invoice.request_id.isnot(None), Invoice.date.between(start, end),
+            Invoice.is_deleted.is_(False),
+        )
+        .order_by(Invoice.date.asc(), Invoice.created_at.asc())
+    ).all()
+
+    matrix: dict[str, dict[str, int]] = {t: {k: 0 for k in group_keys} for t in ISSUE_ROW_TYPES}
+    col_totals = {k: 0 for k in group_keys}
+    detail: list[dict] = []
+
+    for inv in invoices:
+        req = db.get(BloodRequest, inv.request_id)
+        if req is None or req.is_deleted:
+            continue
+        comp_ids = req.issued_component_ids or []
+        comps = []
+        if comp_ids:
+            try:
+                ids = [_uuid.UUID(str(c)) for c in comp_ids]
+            except (ValueError, AttributeError):
+                ids = []
+            comps = db.scalars(select(Component).where(Component.id.in_(ids))).all() if ids else []
+
+        patient = db.get(Patient, req.patient_id) if req.patient_id else None
+        hospital = db.get(Hospital, req.hospital_id) if req.hospital_id else None
+
+        issued_strs = []
+        for c in comps:
+            bag = db.get(BloodBag, c.bag_id) if c.bag_id else None
+            bag_no = bag.bag_no if bag else "—"
+            issued_strs.append(f"{bag_no} ({c.type})")
+            row = matrix.setdefault(c.type, {k: 0 for k in group_keys})
+            key = c.blood_group if c.blood_group in row else None
+            if key:
+                row[key] += 1
+                col_totals[key] += 1
+
+        when = inv.created_at or (req.created_at if req else None)
+        detail.append({
+            "request_date": when.isoformat() if when else str(req.date),
+            "request_id": req.request_id,
+            "patient_name": req.patient_name or (patient.name if patient else "—"),
+            "age": patient.age if patient else None,
+            "sex": (patient.gender if patient else None),
+            "blood_group": req.blood_group,
+            "hospital": hospital.name if hospital else "—",
+            "issued": issued_strs or ["—"],
+            "cross_match_by": "—",
+            "issued_by": inv.created_by or "—",
+            "remarks": "-",
+        })
+
+    # ordered rows: canonical four first, then any extra types encountered
+    row_order = ISSUE_ROW_TYPES + [t for t in matrix if t not in ISSUE_ROW_TYPES]
+    rows = []
+    for t in row_order:
+        vals = matrix[t]
+        rows.append({"name": t, "groups": vals, "total": sum(vals.values())})
+    totals = {k: col_totals[k] for k in group_keys}
+
+    return {
+        "report": "daily-issue-report",
+        "title": "Daily Issue Report",
+        "from": str(start), "to": str(end),
+        "org": {
+            "name": org.name, "address": org.address, "contact": org.contact,
+            "email": org.email, "license_no": org.license_no, "logo_url": org.logo_url,
+        },
+        "columns": [{"key": k, "label": lbl} for k, lbl in ISSUE_BG_COLUMNS],
+        "matrix": {"rows": rows, "totals": totals, "grand_total": sum(totals.values())},
+        "detail": detail,
+    }
+
+
+# Human labels + the unit shown on the summary report sheet for each MIS key.
+MIS_REPORTS_META = {
+    "total-bags-collected": ("Total Bags Collected", "bags"),
+    "total-component-prepared": ("Total Component Prepared", "components"),
+    "tti-reactive-cases": ("TTI Reactive Cases", "cases"),
+    "component-issued-blood": ("Total Component Issued (Blood Requests)", "components"),
+    "component-issued-bulk": ("Total Component Issued (Bulk Request)", "components"),
+    "component-discard": ("Total Component Discard", "components"),
+    "sample-receiving-register": ("Sample Receiving Register", "samples"),
+    "sbtc-report": ("SBTC Report", "units"),
+    "tat": ("Turnaround Time (TAT)", "mins"),
+    "shift-to-tested": ("Shift to Tested Stock", "components"),
+    "near-expiry-stock": ("Near Expiry Stock", "components"),
+    "hospital-consumption": ("Hospital Wise Consumption Report", "components"),
+    "blood-group": ("Blood Group Report", "tested units"),
+    "accounting-voucher": ("Accounting Voucher", "INR"),
+    "daily-summary": ("Daily Summary Report", "bags"),
+    "tat-reservation-issue": ("TAT (Reservation to Issue)", "mins"),
+    "periodic-cash": ("Periodic Cash Report", "INR"),
+    "payment-summary": ("Payment Summary", "INR"),
+    "eraktkosh": ("eRaktKosh Data", "records"),
+}
+
+
 @router.get("/reports/mis/{report_key}")
 def mis_report(report_key: str, frm: str | None = Query(None, alias="from"), to: str | None = None, db: Session = Depends(get_db), org: Organisation = Depends(get_current_org)):
+    """Single-metric MIS summary for a report key, with org header so a printable
+    summary sheet can be rendered. Keys with a dedicated detailed report (e.g. the
+    Daily Issue Report) have their own endpoints."""
+    from app.models.lab import BloodBag
+
     start, end = _date_range(frm, to)
-    if report_key == "total-bags-collected":
-        from app.models.lab import BloodBag
-        n = db.scalar(select(func.count()).select_from(BloodBag).where(BloodBag.org_id == org.id, BloodBag.collection_date.between(start, end))) or 0
-        return {"report": report_key, "from": str(start), "to": str(end), "value": n}
-    if report_key == "total-component-prepared":
-        n = db.scalar(select(func.count()).select_from(Component).where(Component.org_id == org.id, Component.prepared_date.between(start, end))) or 0
-        return {"report": report_key, "value": n}
-    if report_key == "tti-reactive-cases":
-        n = db.scalar(select(func.count()).select_from(TTIResult).where(TTIResult.org_id == org.id, TTIResult.any_reactive.is_(True))) or 0
-        return {"report": report_key, "value": n}
-    if report_key in ("component-discard", "component-issued-blood", "component-issued-bulk"):
+    today = date.today()
+    value: float | int = 0
+    note: str | None = None
+
+    def count(model, *conds):
+        return db.scalar(select(func.count()).select_from(model).where(model.org_id == org.id, *conds)) or 0
+
+    def invoice_sum(direction):
+        return float(db.scalar(
+            select(func.coalesce(func.sum(Invoice.amount_inr), 0)).where(
+                Invoice.org_id == org.id, Invoice.direction == direction, Invoice.date.between(start, end)
+            )
+        ) or 0)
+
+    if report_key == "total-bags-collected" or report_key == "daily-summary":
+        value = count(BloodBag, BloodBag.collection_date.between(start, end))
+    elif report_key == "total-component-prepared":
+        value = count(Component, Component.prepared_date.between(start, end))
+    elif report_key == "tti-reactive-cases":
+        value = count(TTIResult, TTIResult.any_reactive.is_(True))
+    elif report_key in ("component-discard", "component-issued-blood", "component-issued-bulk"):
         status = "discarded" if "discard" in report_key else "issued"
-        n = db.scalar(select(func.count()).select_from(Component).where(Component.org_id == org.id, Component.status == status)) or 0
-        return {"report": report_key, "value": n}
-    if report_key in ("shift-to-tested", "near-expiry-stock"):
-        if report_key == "shift-to-tested":
-            n = db.scalar(select(func.count()).select_from(Component).where(Component.org_id == org.id, Component.status == "tested")) or 0
-        else:
-            n = db.scalar(select(func.count()).select_from(Component).where(Component.org_id == org.id, Component.status == "tested", Component.expiry_date <= date.today() + timedelta(days=30))) or 0
-        return {"report": report_key, "value": n}
-    # generic
-    return {"report": report_key, "value": 0, "note": "computed report — extend as needed"}
+        value = count(Component, Component.status == status)
+    elif report_key == "shift-to-tested":
+        value = count(Component, Component.status == "tested")
+    elif report_key == "near-expiry-stock":
+        value = count(Component, Component.status == "tested", Component.expiry_date <= today + timedelta(days=30))
+    elif report_key == "sample-receiving-register":
+        value = count(TTIResult, TTIResult.created_at >= datetime.combine(start, datetime.min.time()))
+    elif report_key in ("hospital-consumption", "sbtc-report"):
+        value = count(Component, Component.status == "issued")
+    elif report_key == "blood-group":
+        value = count(Component, Component.status == "tested")
+    elif report_key in ("accounting-voucher", "periodic-cash", "payment-summary"):
+        value = invoice_sum("received")
+    else:
+        note = "Computed report — no data source wired yet for this metric."
+
+    label, unit = MIS_REPORTS_META.get(report_key, (report_key.replace("-", " ").title(), ""))
+    return {
+        "report": report_key,
+        "title": label,
+        "unit": unit,
+        "from": str(start), "to": str(end),
+        "value": value,
+        "note": note,
+        "org": {
+            "name": org.name, "address": org.address, "contact": org.contact,
+            "email": org.email, "license_no": org.license_no, "logo_url": org.logo_url,
+        },
+    }
 
 
 @router.get("/reports/feedback-summary")

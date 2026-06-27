@@ -11,6 +11,7 @@ import { CampPage } from "./pages/CampPage";
 
 // module pages
 import { DonorsPage } from "./pages/DonorsPage";
+import { DonorDetailPage } from "./pages/DonorDetailPage";
 import { BagsPage } from "./pages/BagsPage";
 import { StorePage } from "./pages/StorePage";
 import { QCPage } from "./pages/QCPage";
@@ -26,6 +27,8 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ToolsPage } from "./pages/ToolsPage";
 import { FeedbackPage } from "./pages/FeedbackPage";
 import { MisReportsPage, RegistersPage } from "./pages/ReportsPages";
+import { DailyIssueReportPage } from "./pages/DailyIssueReportPage";
+import { MisSummaryReportPage } from "./pages/MisSummaryReportPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { me, loading } = useAuth();
@@ -46,6 +49,7 @@ export function App() {
       <Route path="/camp" element={<Protected><CampPage /></Protected>} />
 
       <Route path="/donors" element={<Protected><DonorsPage /></Protected>} />
+      <Route path="/donor/:id" element={<Protected><DonorDetailPage /></Protected>} />
       <Route path="/bags" element={<Protected><BagsPage /></Protected>} />
       <Route path="/store" element={<Protected><StorePage /></Protected>} />
       <Route path="/qc" element={<Protected><QCPage /></Protected>} />
@@ -64,6 +68,8 @@ export function App() {
       <Route path="/tools" element={<Protected><ToolsPage /></Protected>} />
       <Route path="/feedback" element={<Protected><FeedbackPage /></Protected>} />
       <Route path="/reports/mis" element={<Protected><MisReportsPage /></Protected>} />
+      <Route path="/reports/mis/daily-issue-report" element={<Protected><DailyIssueReportPage /></Protected>} />
+      <Route path="/reports/mis/view/:key" element={<Protected><MisSummaryReportPage /></Protected>} />
       <Route path="/reports/registers" element={<Protected><RegistersPage /></Protected>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

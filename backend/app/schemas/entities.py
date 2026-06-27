@@ -6,7 +6,7 @@ router injects it from the JWT's active org.
 """
 from datetime import date as Date, datetime as DateTime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class _Base(BaseModel):
@@ -48,7 +48,7 @@ class StaffCreate(_Base):
     name: str
     email: EmailStr
     phone: str | None = None
-    password: str = "password123"
+    password: str = Field(min_length=8)
     designation: str = "general"
     permissions: dict = {}
     is_master_user: bool = False
@@ -60,7 +60,7 @@ class StaffUpdate(_Base):
     designation: str | None = None
     permissions: dict | None = None
     is_master_user: bool | None = None
-    password: str | None = None
+    password: str | None = Field(default=None, min_length=8)
 
 
 # ---------- Camp ----------
@@ -421,7 +421,10 @@ class FeedbackCreate(_Base):
     staff_behaviour: int = 0
     would_recommend: int = 0
     date: Date | None = None
+    name: str | None = None
+    contact: str | None = None
     comment: str | None = None
+    action_taken: str | None = None
 
 
 class FeedbackUpdate(_Base):
@@ -429,7 +432,10 @@ class FeedbackUpdate(_Base):
     cleanliness: int | None = None
     staff_behaviour: int | None = None
     would_recommend: int | None = None
+    name: str | None = None
+    contact: str | None = None
     comment: str | None = None
+    action_taken: str | None = None
 
 
 class CustomReportCreate(_Base):

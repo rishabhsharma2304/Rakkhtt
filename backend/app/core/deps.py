@@ -6,9 +6,12 @@ from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.logging import get_logger
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.models.identity import Organisation, User
+
+log = get_logger("auth")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -25,12 +28,15 @@ def get_current_user(
         payload = decode_token(token)
         user_id = payload.get("sub")
         if user_id is None:
+            log.warning("auth.token_invalid", reason="missing_sub")
             raise cred_exc
     except JWTError:
+        log.warning("auth.token_invalid", reason="decode_error")
         raise cred_exc
 
     user = db.get(User, uuid.UUID(user_id))
     if user is None or user.is_deleted:
+        log.warning("auth.token_invalid", reason="unknown_or_deleted_user", user_id=user_id)
         raise cred_exc
     # Stash the token's active org on the instance for get_current_org.
     user._active_org_id = payload.get("org_id")  # type: ignore[attr-defined]

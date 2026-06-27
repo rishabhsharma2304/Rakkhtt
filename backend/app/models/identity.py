@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,3 +42,21 @@ class User(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
 
     org: Mapped["Organisation"] = relationship()
+
+
+class UserOrg(UUIDMixin, TimestampMixin, Base):
+    """Membership junction: which organisations a user may act in / switch to.
+
+    A user always has a row for their home ``org_id``; additional rows grant the
+    cross-centre switcher. ``switch-org`` validates the target against this table
+    so a user can never assume an org they don't belong to.
+    """
+    __tablename__ = "user_orgs"
+    __table_args__ = (UniqueConstraint("user_id", "org_id", name="uq_user_orgs_user_org"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organisations.id"), nullable=False, index=True
+    )

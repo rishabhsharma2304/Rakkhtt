@@ -2,16 +2,16 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-bloodbank}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bloodbank}
-      POSTGRES_DB: ${POSTGRES_DB:-bloodbank}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set (e.g. in .env)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (e.g. in .env)}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set (e.g. in .env)}
     ports:
       # Host 5433 -> container 5432 (avoids clashing with a local Postgres on 5432).
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bloodbank}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER must be set (e.g. in .env)}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,10 +21,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bloodbank}:${POSTGRES_PASSWORD:-bloodbank}@db:5432/${POSTGRES_DB:-bloodbank}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      SEED_ON_START: ${SEED_ON_START:-true}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be set (e.g. in .env)}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (e.g. in .env)}@db:5432/${POSTGRES_DB:?POSTGRES_DB must be set (e.g. in .env)}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (e.g. in .env) — no insecure default}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set (e.g. in .env) — no localhost default}
+      SEED_ON_START: ${SEED_ON_START:?SEED_ON_START must be set explicitly (use false in production)}
     depends_on:
       db:
         condition: service_healthy
@@ -42,7 +42,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      VITE_API_URL: ${VITE_API_URL:?VITE_API_URL must be set (e.g. in .env) — no localhost default}
     depends_on:
       - api
     ports:

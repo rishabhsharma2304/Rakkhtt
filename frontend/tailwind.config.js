@@ -49,6 +49,7 @@ export default {
         "bar-home": "linear-gradient(180deg,#E11D48,#9F1239)",
         "bar-graph": "linear-gradient(180deg,#FB7185,#DC2626)",
         "bar-camp": "linear-gradient(180deg,#FB7185,#9F1239)",
+        "bar-tti": "linear-gradient(180deg,#6B8BE8,#3F63CE)",
         "drop-grad": "linear-gradient(135deg,#E11D48,#9F1239)",
       },
     },

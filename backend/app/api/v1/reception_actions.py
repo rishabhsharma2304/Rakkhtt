@@ -3,20 +3,20 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.orm import Session
 
 import uuid
-from datetime import date as date_cls
+from datetime import date as date_cls, datetime, timezone
 
 from app.api.v1.crud_factory import serialize
 from app.core.deps import get_current_org, get_current_user
 from app.core.rbac import RECEPTION, role_of
 from app.db.session import get_db
 from app.models.audit import ActivityLog
-from app.models.camp import Donor
+from app.models.camp import Camp, Donation, Donor
 from app.models.identity import Organisation, User
-from app.models.lab import BloodBag, Component
+from app.models.lab import BloodBag, Component, GroupingResult, PipelineStageRecord, TTIResult
 from app.models.reception import BloodRequest, Invoice
 from app.services.activity import log_activity
 from app.services.ids import next_invoice_no, next_request_id
@@ -60,19 +60,75 @@ SEROLOGY_STAGES = ["grouping", "crossmatch", "issue", "done"]
 SEROLOGY_LABELS = {"grouping": "Blood Grouping", "crossmatch": "Crossmatch", "issue": "Issue"}
 
 
+# ABO/Rh red-cell compatibility: maps a recipient's blood group to the donor groups
+# whose units may be safely transfused to them. O- is the universal red-cell donor;
+# AB+ is the universal recipient. Used to allocate compatible (not just identical) units.
+RBC_COMPATIBILITY = {
+    "O-": ["O-"],
+    "O+": ["O-", "O+"],
+    "A-": ["O-", "A-"],
+    "A+": ["O-", "O+", "A-", "A+"],
+    "B-": ["O-", "B-"],
+    "B+": ["O-", "O+", "B-", "B+"],
+    "AB-": ["O-", "A-", "B-", "AB-"],
+    "AB+": ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"],
+}
+
+
+def compatible_blood_groups(recipient_group: str | None) -> list[str] | None:
+    """Donor blood groups whose red-cell units are compatible with the recipient.
+    Returns None when the recipient group is unknown/unspecified (no restriction)."""
+    if not recipient_group:
+        return None
+    return RBC_COMPATIBILITY.get(recipient_group.strip().upper())
+
+
+# Component statuses that should auto-expire once their expiry_date has passed.
+# (Already-issued/discarded/expired units are left as-is.)
+_EXPIRABLE_STATUSES = ("untested", "tested", "quarantine", "allotted")
+
+
+def expire_stale_components(db: Session, org: Organisation) -> int:
+    """On-read sweep: flip any in-stock component past its expiry_date to status
+    'expired'. Returns the number of rows updated. Call this before any read or
+    allocation that must not surface expired stock. Caller is responsible for the
+    surrounding commit (this only stages the UPDATE)."""
+    result = db.execute(
+        update(Component)
+        .where(
+            Component.org_id == org.id,
+            Component.is_deleted.is_(False),
+            Component.status.in_(_EXPIRABLE_STATUSES),
+            Component.expiry_date.is_not(None),
+            Component.expiry_date < date_cls.today(),
+        )
+        .values(status="expired")
+    )
+    return result.rowcount or 0
+
+
 def _perform_issue(db: Session, org: Organisation, user: User, req: BloodRequest) -> dict:
     """Allocate tested components to a request → mark issued, raise an invoice, and
     complete billing + serology (Section 8 reception-issue workflow). Only *tested*
     components are issuable."""
+    # Sweep stale stock to 'expired' first so it can never be allocated below.
+    expire_stale_components(db, org)
     q = select(Component).where(
         Component.org_id == org.id, Component.status == "tested",
         Component.type == req.component, Component.is_deleted.is_(False),
+        Component.expiry_date >= date_cls.today(),
     )
     if req.blood_group:
-        q = q.where(Component.blood_group == req.blood_group)
+        compatible = compatible_blood_groups(req.blood_group)
+        if compatible is None:
+            raise HTTPException(422, f"Unknown recipient blood group '{req.blood_group}'; cannot determine compatibility")
+        q = q.where(Component.blood_group.in_(compatible))
     available = db.scalars(q.limit(req.qty)).all()
     if not available:
-        raise HTTPException(409, f"No tested {req.component} {req.blood_group or ''} units available to issue")
+        raise HTTPException(
+            422,
+            f"No ABO/Rh-compatible tested {req.component} units available for {req.blood_group or 'request'}",
+        )
 
     issued_ids = []
     for c in available:
@@ -124,11 +180,49 @@ def advance_serology(body: IssueBody, db: Session = Depends(get_db), org: Organi
     if stage == "issue":
         return _perform_issue(db, org, user, req)
 
+    if stage == "crossmatch":
+        # Crossmatch → Issue is a clinical gate, not a label change: a unit may only
+        # be carried forward to issue once a crossmatch has been performed AND found
+        # compatible. Recording happens via POST /reception/crossmatch.
+        if not req.crossmatch_result:
+            raise HTTPException(422, "No crossmatch result on file — record a crossmatch before advancing to issue")
+        if req.crossmatch_result != "compatible":
+            raise HTTPException(
+                422,
+                f"Crossmatch result is '{req.crossmatch_result}'; an incompatible unit cannot be advanced to issue",
+            )
+
     next_stage = SEROLOGY_STAGES[SEROLOGY_STAGES.index(stage) + 1]
     req.serology_stage = next_stage
     log_activity(db, org, user, f"{SEROLOGY_LABELS.get(stage, stage)} done for {req.request_id}", entity_ref=req.request_id)
     db.commit()
     return {"request_id": req.request_id, "serology_stage": next_stage}
+
+
+class CrossmatchBody(BaseModel):
+    request_id: str  # the UUID of the BloodRequest
+    result: str  # compatible | incompatible
+    unit_id: str | None = None
+
+
+@router.post("/reception/crossmatch")
+def record_crossmatch(body: CrossmatchBody, db: Session = Depends(get_db), org: Organisation = Depends(get_current_org), user: User = Depends(get_current_user)):
+    """Record the crossmatch outcome for a blood request. This must be done (and be
+    'compatible') before serology can advance from crossmatch → issue."""
+    if role_of(user) not in RECEPTION:
+        raise HTTPException(403, "Your role cannot record crossmatch results")
+    req = db.get(BloodRequest, uuid.UUID(body.request_id))
+    if req is None or req.org_id != org.id or req.is_deleted:
+        raise HTTPException(404, "Request not found")
+    result = body.result.strip().lower()
+    if result not in ("compatible", "incompatible"):
+        raise HTTPException(422, "Crossmatch result must be 'compatible' or 'incompatible'")
+    req.crossmatch_result = result
+    req.crossmatch_unit_id = body.unit_id
+    req.crossmatch_at = datetime.now(timezone.utc)
+    log_activity(db, org, user, f"Crossmatch {result} for {req.request_id}", entity_ref=req.request_id)
+    db.commit()
+    return {"request_id": req.request_id, "crossmatch_result": result}
 
 
 # Friendly product names for the printable invoice line items.
@@ -276,6 +370,8 @@ def reception_inventory(
 ):
     """Blood inventory shown on Reception: each row is a single component unit,
     grouped into Available (tested stock), Allotted (reserved) and Issued tabs."""
+    if expire_stale_components(db, org):
+        db.commit()
     counts = {
         b: (db.scalar(
             select(func.count()).select_from(Component).where(
@@ -340,6 +436,131 @@ def reception_activity(
         for a in db.scalars(stmt).all()
     ]
     return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/camps/activity")
+def camps_activity(
+    search: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=500),
+    db: Session = Depends(get_db),
+    org: Organisation = Depends(get_current_org),
+):
+    """History feed for Camps — who added/updated/deleted what, newest first."""
+    stmt = select(ActivityLog).where(ActivityLog.org_id == org.id, ActivityLog.module == "camp")
+    if search:
+        like = f"%{search.lower()}%"
+        stmt = stmt.where(or_(
+            func.lower(ActivityLog.action).like(like),
+            func.lower(ActivityLog.user_name).like(like),
+        ))
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(ActivityLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    items = [
+        {"id": str(a.id), "user": a.user_name, "action": a.action, "created_at": a.created_at}
+        for a in db.scalars(stmt).all()
+    ]
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/donors/{donor_id}/detail")
+def donor_detail_view(
+    donor_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    org: Organisation = Depends(get_current_org),
+):
+    """Full donor profile: donor + latest donation + blood bag + lab results + history."""
+    donor = db.get(Donor, donor_id)
+    if donor is None or donor.org_id != org.id or donor.is_deleted:
+        raise HTTPException(404, "Donor not found")
+
+    # Latest donation (most recent by date)
+    latest_don = db.scalars(
+        select(Donation).where(
+            Donation.donor_id == donor_id,
+            Donation.org_id == org.id,
+            Donation.is_deleted.is_(False),
+        ).order_by(Donation.date.desc())
+    ).first()
+
+    # Latest blood bag
+    latest_bag = db.scalars(
+        select(BloodBag).where(
+            BloodBag.donor_id == donor_id,
+            BloodBag.org_id == org.id,
+            BloodBag.is_deleted.is_(False),
+        ).order_by(BloodBag.collection_date.desc())
+    ).first()
+
+    # Lab data for latest bag
+    components: list = []
+    grouping = None
+    tti = None
+    pipeline_records: list = []
+    if latest_bag:
+        components = list(db.scalars(
+            select(Component).where(
+                Component.bag_id == latest_bag.id,
+                Component.org_id == org.id,
+                Component.is_deleted.is_(False),
+            )
+        ).all())
+        grouping = db.scalars(
+            select(GroupingResult).where(
+                GroupingResult.bag_id == latest_bag.id,
+                GroupingResult.org_id == org.id,
+                GroupingResult.is_deleted.is_(False),
+            )
+        ).first()
+        tti = db.scalars(
+            select(TTIResult).where(
+                TTIResult.bag_id == latest_bag.id,
+                TTIResult.org_id == org.id,
+                TTIResult.is_deleted.is_(False),
+            )
+        ).first()
+        subject_ids = [latest_bag.id] + [c.id for c in components]
+        pipeline_records = list(db.scalars(
+            select(PipelineStageRecord).where(
+                PipelineStageRecord.subject_id.in_(subject_ids),
+                PipelineStageRecord.org_id == org.id,
+            ).order_by(PipelineStageRecord.completed_at.asc())
+        ).all())
+
+    # Camp linked to latest donation or bag
+    camp = None
+    camp_id = getattr(latest_don, "camp_id", None) or getattr(latest_bag, "camp_id", None)
+    if camp_id:
+        camp = db.get(Camp, camp_id)
+
+    # Full history
+    all_donations = list(db.scalars(
+        select(Donation).where(
+            Donation.donor_id == donor_id,
+            Donation.org_id == org.id,
+            Donation.is_deleted.is_(False),
+        ).order_by(Donation.date.desc())
+    ).all())
+    all_bags = list(db.scalars(
+        select(BloodBag).where(
+            BloodBag.donor_id == donor_id,
+            BloodBag.org_id == org.id,
+            BloodBag.is_deleted.is_(False),
+        ).order_by(BloodBag.collection_date.desc())
+    ).all())
+
+    return {
+        "donor": serialize(donor),
+        "latest_donation": serialize(latest_don) if latest_don else None,
+        "bag": serialize(latest_bag) if latest_bag else None,
+        "components": [serialize(c) for c in components],
+        "grouping": serialize(grouping) if grouping else None,
+        "tti": serialize(tti) if tti else None,
+        "camp": serialize(camp) if camp else None,
+        "pipeline_records": [serialize(p) for p in pipeline_records],
+        "all_donations": [serialize(d) for d in all_donations],
+        "all_bags": [serialize(b) for b in all_bags],
+    }
 
 
 @router.get("/donor/recall")

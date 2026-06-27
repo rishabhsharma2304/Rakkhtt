@@ -16,6 +16,7 @@ from app.core.rbac import require_write
 from app.db.base import Base
 from app.db.session import get_db
 from app.models.identity import Organisation, User
+from app.services.activity import log_activity
 
 RESERVED_QS = {"page", "page_size", "search", "sort", "order"}
 
@@ -40,6 +41,7 @@ def build_crud_router(
     search_fields: list[str] | None = None,
     default_sort: str = "created_at",
     default_order: str = "desc",
+    activity_module: str | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix=prefix, tags=[tag])
     has_soft_delete = hasattr(model, "is_deleted")
@@ -104,6 +106,12 @@ def build_crud_router(
         data = payload.model_dump(exclude_unset=True)
         obj = model(**data, org_id=org.id)
         db.add(obj)
+        db.flush()
+        if activity_module:
+            label = getattr(obj, "name", None) or str(obj.id)
+            date_str = f" ({getattr(obj, 'date', None)})" if hasattr(obj, "date") else ""
+            log_activity(db, org, user, f"Added {label}{date_str} Camp",
+                         module=activity_module, entity_ref=str(obj.id))
         db.commit()
         db.refresh(obj)
         return serialize(obj)
@@ -122,6 +130,10 @@ def build_crud_router(
             raise HTTPException(404, f"{tag} not found")
         for k, v in payload.model_dump(exclude_unset=True).items():
             setattr(obj, k, v)
+        if activity_module:
+            label = getattr(obj, "name", None) or str(obj.id)
+            log_activity(db, org, user, f"Updated {label}",
+                         module=activity_module, entity_ref=str(obj.id))
         db.commit()
         db.refresh(obj)
         return serialize(obj)
@@ -136,6 +148,10 @@ def build_crud_router(
         obj = db.get(model, item_id)
         if obj is None or obj.org_id != org.id:
             raise HTTPException(404, f"{tag} not found")
+        if activity_module:
+            label = getattr(obj, "name", None) or str(item_id)
+            log_activity(db, org, user, f"Deleted {label}",
+                         module=activity_module, entity_ref=str(item_id))
         if has_soft_delete:
             obj.is_deleted = True
         else:

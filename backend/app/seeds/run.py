@@ -19,9 +19,10 @@ from app.models.audit import ActivityLog
 from app.models.camp import Camp, Donation, Donor, Vehicle
 from app.models.directory import (BloodInquiry, Hospital, Patient,
                                    TherapeuticDonation, ThalassemiaPatient)
-from app.models.identity import Organisation, User
+from app.models.identity import Organisation, User, UserOrg
 from app.models.inventory import QCRecord, StoreItem
-from app.models.lab import BloodBag, Component, GroupingResult, TTIResult
+from app.models.lab import (BloodBag, Component, GroupingResult,
+                            PipelineStageRecord, TTIResult)
 from app.models.reception import (BarcodeBatch, BloodRequest, Download, Feedback,
                                   Invoice, LabelJob, Reservation)
 
@@ -95,6 +96,10 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
             is_master_user=master, org_id=org.id,
             permissions={"role_label": role_label},
         ))
+    db.flush()
+    # Every staff member is a member of their home centre.
+    for u in db.query(User).filter(User.org_id == org.id).all():
+        db.add(UserOrg(user_id=u.id, org_id=org.id))
     db.flush()
 
     # ---- Vehicles ----
@@ -264,6 +269,30 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
                     ))
     db.flush()
 
+    # ---- Discarded components (with TTI / physical reasons) so the Blood Bag
+    # overview discard donuts populate. Reactive (quarantined) units are discarded
+    # with a serology reason; a few tested units fail QC for physical reasons.
+    tti_reasons = ["HCVAb Positive", "HIV I & II Reactive", "HBsAg Positive"]
+    phys_reasons = ["Lipemic", "Clotted Unit", "Less Quantity"]
+    quarantined = db.query(Component).filter(
+        Component.org_id == org.id, Component.status == "quarantine").all()
+    tested_comps = db.query(Component).filter(
+        Component.org_id == org.id, Component.status == "tested").all()
+    random.shuffle(tested_comps)
+
+    def _discard(comp, reason):
+        comp.status = "discarded"
+        db.add(PipelineStageRecord(
+            org_id=org.id, subject_id=comp.id, pipeline="component", stage="discard",
+            completed_at=datetime.now(timezone.utc), done_by=fake.name(),
+            data={"reason": reason}))
+
+    for c in quarantined[: (8 if is_primary else 4)]:
+        _discard(c, random.choice(tti_reasons))
+    for c in tested_comps[: (4 if is_primary else 2)]:
+        _discard(c, random.choice(phys_reasons))
+    db.flush()
+
     # ---- Extra donation registrations with mixed statuses so the donor
     # dashboard tabs (Pending / Completed / Deferrals) are all populated.
     # These represent walk-in / camp registrations not yet processed into bags.
@@ -334,6 +363,9 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
         # Pending requests sit at one of the in-flight serology stages so the
         # "Show Pending Only" view shows varied Blood Grouping / Crossmatch / Issue actions.
         stage = "done" if serology == "completed" else random.choice(["grouping", "crossmatch", "issue"])
+        # A crossmatch must be on file (and compatible) before a request reaches issue,
+        # so seed one for any request that has already passed the crossmatch stage.
+        crossmatch = "compatible" if stage in ("issue", "done") else None
         db.add(BloodRequest(
             request_id=f"{org.id_prefix}26-R{n:05d}", date=req_date,
             request_type=type_plan[i],
@@ -343,6 +375,8 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
             billing_status=random.choice(["completed", "completed", "pending"]),
             serology_status=serology,
             serology_stage=stage,
+            crossmatch_result=crossmatch,
+            crossmatch_at=datetime.now(timezone.utc) if crossmatch else None,
             org_id=org.id,
         ))
     db.flush()
@@ -355,9 +389,18 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
                        amount_inr=random.choice([400, 1450, 600, 11000]) * r.qty,
                        created_by=fake.name(), request_id=r.id, org_id=org.id))
 
+    # ---- Activity log / History (camps) — backfill so the Camp History feed is populated.
+    staff_names = [u.name for u in db.query(User).filter(User.org_id == org.id).all()] or ["System"]
+    for c in camps:
+        base = (datetime.combine(c.date, datetime.min.time()).replace(tzinfo=timezone.utc)
+                + timedelta(hours=random.randint(8, 18), minutes=random.randint(0, 59)))
+        db.add(ActivityLog(org_id=org.id, module="camp", user_name=random.choice(staff_names),
+                           action=f"Added {c.name} {c.location_text or ''} Camp ({c.date.strftime('%d %b %Y')})",
+                           entity_ref=str(c.id), created_at=base))
+    db.flush()
+
     # ---- Activity log / History (reception) — backfill so the History feed is
     # populated for existing requests (newest entries appear first in the modal).
-    staff_names = [u.name for u in db.query(User).filter(User.org_id == org.id).all()] or ["System"]
     for r in reqs:
         base = (datetime.combine(r.date, datetime.min.time()).replace(tzinfo=timezone.utc)
                 + timedelta(hours=random.randint(8, 20), minutes=random.randint(0, 59)))
@@ -384,7 +427,10 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
                         overall=random.randint(3, 5), cleanliness=random.randint(3, 5),
                         staff_behaviour=random.randint(3, 5), would_recommend=random.randint(3, 5),
                         date=date.today() - timedelta(days=random.randint(0, 30)),
-                        comment=fake.sentence(), org_id=org.id))
+                        name=fake.name(), contact=fake.phone_number(),
+                        comment=fake.sentence(),
+                        action_taken=random.choice([None, "Acknowledged", "Resolved", "Forwarded to staff"]),
+                        org_id=org.id))
     db.add(BarcodeBatch(batch_type="blood_bag", bag_type="DB-SAGM-450", prepend_text=f"{org.id_prefix}26-D",
                         range_start=801, range_end=860, copies=2, generated_by=fake.name(), org_id=org.id))
     db.add(Download(description=f"Barcodes, {org.id_prefix}26-D0801 - {org.id_prefix}26-D0860",
@@ -395,15 +441,12 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
 
 
 def main():
-    # Respect SEED_ON_START: if disabled and data already exists, do nothing.
+    # Respect SEED_ON_START: when disabled, never wipe or seed — regardless of
+    # whether data exists. The wipe() below does drop_all + create_all, so a fresh
+    # DB (tables migrated by alembic but no rows yet) must NOT fall through to it.
     if not settings.SEED_ON_START:
-        db = SessionLocal()
-        try:
-            if db.query(Organisation).first() is not None:
-                print("[seed] SEED_ON_START=false and data present — skipping.")
-                return
-        finally:
-            db.close()
+        print("[seed] SEED_ON_START=false — skipping seed (no wipe).")
+        return
     wipe()
     db = SessionLocal()
     try:
@@ -411,6 +454,15 @@ def main():
         secondary = make_org(db, "Jeevan Dhara Blood Bank", "JDBB")
         login_email = seed_org(db, primary, is_primary=True)
         seed_org(db, secondary, is_primary=False)
+
+        # Master users belong to both centres so the top-bar switcher demo works;
+        # regular staff stay scoped to their home centre (switch-org enforces this).
+        all_orgs = [primary, secondary]
+        for masteruser in db.query(User).filter(User.is_master_user.is_(True)).all():
+            for o in all_orgs:
+                if o.id != masteruser.org_id:
+                    db.add(UserOrg(user_id=masteruser.id, org_id=o.id))
+        db.flush()
         db.commit()
         print(f"[seed] done. Brand={settings.BRAND_NAME}")
         print(f"[seed] login -> {login_email} / password123")

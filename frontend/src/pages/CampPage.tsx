@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Plus, Tent } from "lucide-react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, History, Plus, Tent } from "lucide-react";
 import { api, fetchList } from "@/lib/api";
-import { Card, PrimaryButton, SectionBanner } from "@/components/ui";
+import { Card, EmptyState, ExportButtons, Modal, PrimaryButton, SectionBanner } from "@/components/ui";
 import { EntityForm } from "@/components/EntityForm";
 import type { Field } from "@/components/DataTable";
 import { BarChart, Donut, Legend } from "@/components/charts";
+import { fmtDate } from "@/lib/format";
+import { downloadCSV } from "@/lib/download";
 
 const CAMP_FIELDS: Field[] = [
   { name: "name", label: "Camp name", required: true, full: true },
@@ -29,6 +31,7 @@ const TODAY = 25;
 export function CampPage() {
   const [tab, setTab] = useState<"calendar" | "overview">("calendar");
   const [adding, setAdding] = useState(false);
+  const [histOpen, setHistOpen] = useState(false);
   const { data } = useQuery({ queryKey: ["camps-month"], queryFn: () => fetchList("/camps", { page_size: 100, sort: "date", order: "asc" }) });
   const camps = (data?.items ?? []).filter((c: any) => c.type === "camp");
 
@@ -48,7 +51,17 @@ export function CampPage() {
             </button>
           ))}
         </div>
-        <PrimaryButton onClick={() => setAdding(true)}><Plus size={16} /> Add Camp</PrimaryButton>
+        <div className="flex items-center gap-2">
+          <PrimaryButton onClick={() => setAdding(true)}><Plus size={16} /> Add Camp</PrimaryButton>
+          <button
+            onClick={() => setHistOpen(true)}
+            aria-label="History"
+            title="History"
+            className="inline-flex items-center justify-center rounded-btn border border-line-chip bg-card p-2.5 text-ink-4 shadow-card transition hover:bg-hovertint"
+          >
+            <History size={17} />
+          </button>
+        </div>
       </div>
 
       {tab === "calendar" ? <CalendarView camps={camps} /> : <OverviewView camps={camps} />}
@@ -60,9 +73,106 @@ export function CampPage() {
         path="/camps"
         fields={CAMP_FIELDS}
         initial={{ type: "camp" }}
-        invalidate={[["camps-month"], ["camp-graph"]]}
+        invalidate={[["camps-month"], ["camp-graph"], ["camp-activity"]]}
       />
+
+      <CampHistoryModal open={histOpen} onClose={() => setHistOpen(false)} />
     </div>
+  );
+}
+
+// ---- helpers shared by the modal ----
+function printTable(title: string, headers: string[], rows: (string | number | null | undefined)[][]) {
+  const head = headers.map((h) => `<th>${h}</th>`).join("");
+  const body = rows.map((r) => `<tr>${r.map((c) => `<td>${c ?? "—"}</td>`).join("")}</tr>`).join("");
+  const w = window.open("", "_blank", "width=900,height=700");
+  if (!w) return;
+  w.document.write(`<!doctype html><title>${title}</title>
+    <style>body{font-family:system-ui,sans-serif;padding:24px;color:#1f2937}
+    h2{margin:0 0 16px}table{border-collapse:collapse;width:100%;font-size:13px}
+    th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left}
+    th{background:#f3f4f6}</style>
+    <h2>${title}</h2><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+const PageBar = ({ page, pageSize, total, onPage }: { page: number; pageSize: number; total: number; onPage: (p: number) => void }) => (
+  <div className="flex items-center justify-between gap-3 pt-4 text-sm text-muted">
+    <span>
+      Showing {total === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total} entries
+    </span>
+    <div className="flex items-center gap-1">
+      <button disabled={page <= 1} onClick={() => onPage(page - 1)} className="rounded-lg border border-line-chip px-3 py-1.5 font-semibold disabled:opacity-40 hover:bg-hovertint">Previous</button>
+      <span className="rounded-lg bg-accent px-3 py-1.5 font-bold text-white">{page}</span>
+      <button disabled={page * pageSize >= total} onClick={() => onPage(page + 1)} className="rounded-lg border border-line-chip px-3 py-1.5 font-semibold disabled:opacity-40 hover:bg-hovertint">Next</button>
+    </div>
+  </div>
+);
+
+function CampHistoryModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const { data } = useQuery({
+    queryKey: ["camp-activity", search, page],
+    queryFn: async () =>
+      (await api.get("/camps/activity", { params: { search, page, page_size: pageSize } })).data,
+    enabled: open,
+    placeholderData: keepPreviousData,
+  });
+  const rows = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const fmtTs = (t: string) => fmtDate(t, "dd MMM yyyy hh:mm a");
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={<span className="inline-flex items-center gap-2"><History size={18} /> History</span>}
+      width="max-w-3xl"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+        <ExportButtons
+          onExcel={() => downloadCSV("camp-history.csv", rows.map((r: any) => ({ User: r.user, Action: r.action, "Created At": fmtTs(r.created_at) })))}
+          onPrint={() => printTable("Camp History", ["User", "Action", "Created At"], rows.map((r: any) => [r.user, r.action, fmtTs(r.created_at)]))}
+        />
+        <input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Search…"
+          className="w-56 rounded-xl border border-line-chip bg-page px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/30"
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-fill text-[12.5px] font-bold uppercase tracking-wide text-muted">
+              <th className="px-4 py-3 text-left">User</th>
+              <th className="px-4 py-3 text-left">Action</th>
+              <th className="px-4 py-3 text-left">Created At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr><td colSpan={3}><EmptyState message="No history yet." /></td></tr>
+            ) : (
+              rows.map((r: any) => (
+                <tr key={r.id} className="border-t border-line-table hover:bg-rowtint">
+                  <td className="px-4 py-3 font-semibold text-ink">{r.user ?? "—"}</td>
+                  <td className="px-4 py-3 text-accent">{r.action}</td>
+                  <td className="px-4 py-3 text-ink-3">{fmtTs(r.created_at)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <PageBar page={page} pageSize={pageSize} total={total} onPage={setPage} />
+    </Modal>
   );
 }
 

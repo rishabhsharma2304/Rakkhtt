@@ -5,6 +5,7 @@ import { ChevronRight, Menu, X } from "lucide-react";
 interface MenuItem {
   label: string;
   to: string;
+  children?: MenuItem[];
 }
 interface MenuGroup {
   header?: string;
@@ -83,7 +84,19 @@ const NAV: NavEntry[] = [
         items: [
           { label: "MIS Reports", to: "/reports/mis" },
           { label: "Registers", to: "/reports/registers" },
-          { label: "Graphs", to: "/analytics?tab=graphs" },
+          {
+            label: "Graphs",
+            to: "/analytics?tab=graphs",
+            children: [
+              { label: "Accounting", to: "/accounting" },
+              { label: "Camp", to: "/analytics?tab=graphs&report=camp" },
+              { label: "Blood Bags", to: "/analytics?tab=graphs&report=component" },
+              { label: "Donor", to: "/analytics?tab=graphs&report=donor" },
+              { label: "Deferred Donor", to: "/analytics?tab=graphs&report=donor-deferred" },
+              { label: "Reception", to: "/analytics?tab=graphs&report=reception" },
+              { label: "TTI", to: "/analytics?tab=graphs&report=tti" },
+            ],
+          },
           { label: "Performance Indicators", to: "/analytics?tab=pi" },
           { label: "Feedbacks", to: "/feedback" },
           { label: "Donor Recall", to: "/donor-recall" },
@@ -101,6 +114,7 @@ function isActive(pathname: string, to: string): boolean {
 
 export function NavBar() {
   const [open, setOpen] = useState<string | null>(null);
+  const [subOpen, setSubOpen] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const loc = useLocation();
   const nav = useNavigate();
@@ -142,16 +156,31 @@ export function NavBar() {
                 <div key={gi} className="ml-2 border-l border-white/15 pl-3">
                   {g.header && <div className="px-2 pt-2 text-[11.5px] font-bold uppercase tracking-wide text-white/50">{g.header}</div>}
                   {g.items.map((it) => (
-                    <Link
-                      key={it.to}
-                      to={it.to}
-                      onClick={() => setMobileOpen(false)}
-                      className={`block rounded-lg px-2 py-2 text-[14px] font-semibold ${
-                        isActive(loc.pathname, it.to) ? "text-white" : "text-white/70 hover:text-white"
-                      }`}
-                    >
-                      {it.label}
-                    </Link>
+                    <div key={it.to}>
+                      <Link
+                        to={it.to}
+                        onClick={() => setMobileOpen(false)}
+                        className={`block rounded-lg px-2 py-2 text-[14px] font-semibold ${
+                          isActive(loc.pathname, it.to) ? "text-white" : "text-white/70 hover:text-white"
+                        }`}
+                      >
+                        {it.label}
+                      </Link>
+                      {it.children && (
+                        <div className="ml-3 border-l border-white/15 pl-3">
+                          {it.children.map((sub) => (
+                            <Link
+                              key={sub.to}
+                              to={sub.to}
+                              onClick={() => setMobileOpen(false)}
+                              className="block rounded-lg px-2 py-1.5 text-[13.5px] font-semibold text-white/60 hover:text-white"
+                            >
+                              {sub.label}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               ))}
@@ -190,6 +219,54 @@ export function NavBar() {
                       )}
                       {g.items.map((it) => {
                         const itActive = isActive(loc.pathname, it.to);
+                        if (it.children) {
+                          return (
+                            <div
+                              key={it.to}
+                              className="relative"
+                              onMouseEnter={() => setSubOpen(it.label)}
+                              onMouseLeave={() => setSubOpen(null)}
+                            >
+                              <Link
+                                to={it.to}
+                                onClick={() => { setOpen(null); setSubOpen(null); }}
+                                className="group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[14.5px] font-semibold text-ink-4 transition hover:bg-hovertint hover:text-accent-deep"
+                              >
+                                <span className="flex items-center gap-2.5">
+                                  <span
+                                    className={`h-[9px] w-[9px] rounded-full border-2 ${
+                                      itActive ? "border-accent bg-accent" : "border-line-chip"
+                                    }`}
+                                  />
+                                  {it.label}
+                                </span>
+                                <ChevronRight size={14} className="text-muted-3" />
+                              </Link>
+                              {subOpen === it.label && (
+                                <div className="absolute left-full top-0 z-50 ml-1 min-w-[210px] animate-rakRise rounded-2xl border border-line-drop bg-card p-2.5 shadow-dropnav">
+                                  {it.children.map((sub) => {
+                                    const subActive = isActive(loc.pathname, sub.to) && (sub.to.split("?")[0] !== "/analytics" || loc.search.includes(sub.to.split("?")[1] ?? ""));
+                                    return (
+                                      <Link
+                                        key={sub.to}
+                                        to={sub.to}
+                                        onClick={() => { setOpen(null); setSubOpen(null); }}
+                                        className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14.5px] font-semibold text-ink-4 transition hover:bg-hovertint hover:text-accent-deep"
+                                      >
+                                        <span
+                                          className={`h-[9px] w-[9px] rounded-full border-2 ${
+                                            subActive ? "border-accent bg-accent" : "border-line-chip"
+                                          }`}
+                                        />
+                                        {sub.label}
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
                         return (
                           <Link
                             key={it.to}
