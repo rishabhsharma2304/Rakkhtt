@@ -19,6 +19,7 @@ import { ShiftToTestedPage } from "./pages/ShiftToTestedPage";
 import { QuarantinePage } from "./pages/QuarantinePage";
 import { DonorRecallPage } from "./pages/DonorRecallPage";
 import { AccountingPage } from "./pages/AccountingPage";
+import { InvoicePage } from "./pages/InvoicePage";
 import { DirectoryPage } from "./pages/DirectoryPage";
 import { UsersPage } from "./pages/UsersPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -40,6 +41,7 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<Protected><HomePage /></Protected>} />
       <Route path="/reception" element={<Protected><ReceptionPage /></Protected>} />
+      <Route path="/reception/blood-request/invoice/:requestId" element={<Protected><InvoicePage /></Protected>} />
       <Route path="/analytics" element={<Protected><AnalyticsPage /></Protected>} />
       <Route path="/camp" element={<Protected><CampPage /></Protected>} />
 
@@ -55,6 +57,7 @@ export function App() {
 
       <Route path="/donor-recall" element={<Protected><DonorRecallPage /></Protected>} />
       <Route path="/accounting" element={<Protected><AccountingPage /></Protected>} />
+      <Route path="/invoices/:id" element={<Protected><InvoicePage /></Protected>} />
       <Route path="/directory" element={<Protected><DirectoryPage /></Protected>} />
       <Route path="/users" element={<Protected><UsersPage /></Protected>} />
       <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />

@@ -317,6 +317,7 @@ class RequestCreate(_Base):
     qty: int = 1
     billing_status: str = "pending"
     serology_status: str = "pending"
+    serology_stage: str = "grouping"
     issued_component_ids: list = []
 
 
@@ -331,6 +332,7 @@ class RequestUpdate(_Base):
     qty: int | None = None
     billing_status: str | None = None
     serology_status: str | None = None
+    serology_stage: str | None = None
     issued_component_ids: list | None = None
 
 

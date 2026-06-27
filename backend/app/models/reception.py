@@ -22,6 +22,8 @@ class BloodRequest(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, B
     qty: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     billing_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)  # pending|completed
     serology_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    # Serology workflow stage while serology is pending: grouping → crossmatch → issue → done
+    serology_stage: Mapped[str] = mapped_column(String(20), default="grouping", nullable=False)
     issued_component_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
 

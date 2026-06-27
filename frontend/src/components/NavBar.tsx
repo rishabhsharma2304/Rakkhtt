@@ -73,10 +73,11 @@ const NAV: NavEntry[] = [
   { key: "donor", label: "Donor", to: "/donors" },
   { key: "qc", label: "QC", to: "/qc" },
   { key: "store", label: "Store", to: "/store" },
+  { key: "reception", label: "Reception", to: "/reception" },
   {
-    key: "reception",
-    label: "Reception",
-    to: "/reception",
+    key: "analytics",
+    label: "Analytics",
+    to: "/analytics",
     groups: [
       {
         items: [
@@ -90,7 +91,6 @@ const NAV: NavEntry[] = [
       },
     ],
   },
-  { key: "analytics", label: "Analytics", to: "/analytics" },
 ];
 
 function isActive(pathname: string, to: string): boolean {

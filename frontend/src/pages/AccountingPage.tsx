@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { DataTable, type Column } from "@/components/DataTable";
@@ -19,6 +20,7 @@ const columns: Column<any>[] = [
 ];
 
 export function AccountingPage() {
+  const navigate = useNavigate();
   const { data } = useQuery({ queryKey: ["accounting"], queryFn: async () => (await api.get("/accounting/summary")).data });
 
   return (
@@ -37,6 +39,7 @@ export function AccountingPage() {
           searchPlaceholder="Search invoice / name…"
           defaultSort="date"
           emptyMessage="No invoices."
+          onRowClick={(r) => navigate(`/invoices/${r.id}`)}
           filterFields={[{ name: "direction", label: "Direction", options: [
             { value: "received", label: "Received" }, { value: "sent", label: "Sent" },
           ] }]}

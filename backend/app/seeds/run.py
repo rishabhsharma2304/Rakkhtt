@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import SessionLocal, engine
 from app.db.base import Base
+from app.models.audit import ActivityLog
 from app.models.camp import Camp, Donation, Donor, Vehicle
 from app.models.directory import (BloodInquiry, Hospital, Patient,
                                    TherapeuticDonation, ThalassemiaPatient)
@@ -209,7 +210,8 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
             if reactive:
                 status = "quarantine"
             elif grp_validated and tti_validated:
-                status = random.choices(["tested", "untested", "issued"], weights=[70, 18, 12])[0]
+                # "allotted" = reserved/cross-matched for a request, awaiting issue.
+                status = random.choices(["tested", "untested", "issued", "allotted"], weights=[60, 16, 12, 12])[0]
             else:
                 status = "untested"
             prepared = coll + timedelta(days=1)
@@ -328,6 +330,10 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
     for i, n in enumerate(range(620, 620 - n_reqs, -1)):
         req_date = date(2026, 6, random.randint(18, 24))
         p = random.choice(patients)
+        serology = random.choice(["completed", "completed", "pending"])
+        # Pending requests sit at one of the in-flight serology stages so the
+        # "Show Pending Only" view shows varied Blood Grouping / Crossmatch / Issue actions.
+        stage = "done" if serology == "completed" else random.choice(["grouping", "crossmatch", "issue"])
         db.add(BloodRequest(
             request_id=f"{org.id_prefix}26-R{n:05d}", date=req_date,
             request_type=type_plan[i],
@@ -335,7 +341,8 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
             hospital_id=p.hospital_id, blood_group=rgroup(), component=random.choice(components_pool),
             qty=random.randint(1, 3),
             billing_status=random.choice(["completed", "completed", "pending"]),
-            serology_status=random.choice(["completed", "completed", "pending"]),
+            serology_status=serology,
+            serology_stage=stage,
             org_id=org.id,
         ))
     db.flush()
@@ -347,6 +354,20 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
                        direction=random.choice(["received", "received", "sent"]),
                        amount_inr=random.choice([400, 1450, 600, 11000]) * r.qty,
                        created_by=fake.name(), request_id=r.id, org_id=org.id))
+
+    # ---- Activity log / History (reception) — backfill so the History feed is
+    # populated for existing requests (newest entries appear first in the modal).
+    staff_names = [u.name for u in db.query(User).filter(User.org_id == org.id).all()] or ["System"]
+    for r in reqs:
+        base = (datetime.combine(r.date, datetime.min.time()).replace(tzinfo=timezone.utc)
+                + timedelta(hours=random.randint(8, 20), minutes=random.randint(0, 59)))
+        db.add(ActivityLog(org_id=org.id, module="reception", user_name=random.choice(staff_names),
+                           action=f"Added {r.request_id}", entity_ref=r.request_id, created_at=base))
+        if r.billing_status == "completed" and r.serology_status == "completed":
+            db.add(ActivityLog(org_id=org.id, module="reception", user_name=random.choice(staff_names),
+                               action=f"Issued {r.qty} unit(s) for {r.request_id}", entity_ref=r.request_id,
+                               created_at=base + timedelta(hours=1)))
+    db.flush()
 
     # ---- Misc directory / tools ----
     for _ in range(5):

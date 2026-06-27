@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Wrench } from "lucide-react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { CompositeLabel } from "@/components/CompositeLabel";
+import { BarcodeGenerator } from "@/components/BarcodeGenerator";
 import { Card, SectionBanner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 
@@ -67,6 +68,12 @@ export function ToolsPage() {
           ))}
         </div>
         <div className="space-y-5 p-5">
+          {active.key === "barcode" && (
+            <Card className="p-5">
+              <h3 className="mb-4 font-display text-[17px] font-bold text-ink">Barcode Generator</h3>
+              <BarcodeGenerator />
+            </Card>
+          )}
           {active.key === "labels" && (
             <Card className="p-5">
               <h3 className="mb-4 font-display text-[17px] font-bold text-ink">Composite Label Generator</h3>
