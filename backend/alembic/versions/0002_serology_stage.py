@@ -19,13 +19,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "blood_requests",
-        sa.Column("serology_stage", sa.String(length=20), nullable=False, server_default="grouping"),
+    # IF NOT EXISTS so the chain stays composable on a fresh DB, where 0001's
+    # metadata.create_all already built this column from the current models.
+    op.execute(
+        "ALTER TABLE blood_requests ADD COLUMN IF NOT EXISTS "
+        "serology_stage VARCHAR(20) NOT NULL DEFAULT 'grouping'"
     )
     # Requests with serology already completed are past the workflow.
     op.execute("UPDATE blood_requests SET serology_stage = 'done' WHERE serology_status = 'completed'")
 
 
 def downgrade() -> None:
-    op.drop_column("blood_requests", "serology_stage")
+    op.execute("ALTER TABLE blood_requests DROP COLUMN IF EXISTS serology_stage")

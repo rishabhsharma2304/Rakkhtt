@@ -13,7 +13,10 @@ from faker import Faker
 
 from app.core.config import settings
 from app.core.security import hash_password
-from app.db.session import SessionLocal, engine
+# Seeds run privileged: DDL (drop_all/create_all) and cross-tenant bulk inserts must
+# bypass RLS, so use the admin engine/session bound to DATABASE_URL, not the (possibly
+# RLS-restricted) runtime engine.
+from app.db.session import AdminSessionLocal as SessionLocal, admin_engine as engine
 from app.db.base import Base
 from app.models.audit import ActivityLog
 from app.models.camp import Camp, Donation, Donor, Vehicle

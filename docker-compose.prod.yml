@@ -6,9 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set (e.g. in .env)}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (e.g. in .env)}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set (e.g. in .env)}
-    ports:
-      # Host 5433 -> container 5432 (avoids clashing with a local Postgres on 5432).
-      - "5433:5432"
+    # No host port: the database is reachable only on the internal compose network
+    # (api + db-backup). Don't publish 5432/5433 to the host in production.
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,16 +23,24 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be set (e.g. in .env)}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (e.g. in .env)}@db:5432/${POSTGRES_DB:?POSTGRES_DB must be set (e.g. in .env)}
+      # Optional restricted-role URL for RLS enforcement (see .env.example). Empty → owner.
+      APP_DATABASE_URL: ${APP_DATABASE_URL:-}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (e.g. in .env) — no insecure default}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set (your web origin) — no localhost default}
       SEED_ON_START: ${SEED_ON_START:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Enable only when a trusted reverse proxy sets X-Forwarded-For (then per-IP rate
+      # limits key on the real client instead of the proxy address).
+      RATE_LIMIT_TRUST_FORWARDED: ${RATE_LIMIT_TRUST_FORWARDED:-false}
     depends_on:
       db:
         condition: service_healthy
+    # Published for a TLS-terminating reverse proxy to sit in front of. Do NOT expose
+    # this port directly to the internet without HTTPS termination ahead of it.
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
+    # No source bind-mount in production — the image ships the code. --workers for
+    # concurrency; no --reload.
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --timeout-keep-alive 30"
@@ -47,18 +54,16 @@ services:
   web:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
+      args:
+        # Baked into the static build; point at the public API origin (https://...).
+        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL must be set (your public API origin)}
     restart: unless-stopped
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     depends_on:
       - api
+    # Static assets served by nginx. Front this with your TLS terminator (or map 443).
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0
+      - "80:80"
 
   # Scheduled logical backups of the Postgres database. Runs pg_dump on a cron
   # schedule (default: daily at 02:00) and keeps a rolling retention window.

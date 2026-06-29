@@ -20,12 +20,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("feedback", sa.Column("name", sa.String(length=200), nullable=True))
-    op.add_column("feedback", sa.Column("contact", sa.String(length=40), nullable=True))
-    op.add_column("feedback", sa.Column("action_taken", sa.Text(), nullable=True))
+    # IF NOT EXISTS keeps the chain composable on a fresh DB (0001 create_all already
+    # built these columns from the current models).
+    op.execute("ALTER TABLE feedback ADD COLUMN IF NOT EXISTS name VARCHAR(200)")
+    op.execute("ALTER TABLE feedback ADD COLUMN IF NOT EXISTS contact VARCHAR(40)")
+    op.execute("ALTER TABLE feedback ADD COLUMN IF NOT EXISTS action_taken TEXT")
 
 
 def downgrade() -> None:
-    op.drop_column("feedback", "action_taken")
-    op.drop_column("feedback", "contact")
-    op.drop_column("feedback", "name")
+    op.execute("ALTER TABLE feedback DROP COLUMN IF EXISTS action_taken")
+    op.execute("ALTER TABLE feedback DROP COLUMN IF EXISTS contact")
+    op.execute("ALTER TABLE feedback DROP COLUMN IF EXISTS name")
