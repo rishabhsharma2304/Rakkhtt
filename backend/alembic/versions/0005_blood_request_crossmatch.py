@@ -19,14 +19,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("blood_requests", sa.Column("crossmatch_result", sa.String(length=20), nullable=True))
-    op.add_column("blood_requests", sa.Column("crossmatch_unit_id", sa.String(length=60), nullable=True))
-    op.add_column("blood_requests", sa.Column("crossmatch_at", sa.DateTime(timezone=True), nullable=True))
+    # IF NOT EXISTS keeps the chain composable on a fresh DB (0001 create_all already
+    # built these columns from the current models).
+    op.execute("ALTER TABLE blood_requests ADD COLUMN IF NOT EXISTS crossmatch_result VARCHAR(20)")
+    op.execute("ALTER TABLE blood_requests ADD COLUMN IF NOT EXISTS crossmatch_unit_id VARCHAR(60)")
+    op.execute("ALTER TABLE blood_requests ADD COLUMN IF NOT EXISTS crossmatch_at TIMESTAMPTZ")
     # Backfill: requests whose serology is already completed implicitly passed crossmatch.
     op.execute("UPDATE blood_requests SET crossmatch_result = 'compatible' WHERE serology_status = 'completed'")
 
 
 def downgrade() -> None:
-    op.drop_column("blood_requests", "crossmatch_at")
-    op.drop_column("blood_requests", "crossmatch_unit_id")
-    op.drop_column("blood_requests", "crossmatch_result")
+    op.execute("ALTER TABLE blood_requests DROP COLUMN IF EXISTS crossmatch_at")
+    op.execute("ALTER TABLE blood_requests DROP COLUMN IF EXISTS crossmatch_unit_id")
+    op.execute("ALTER TABLE blood_requests DROP COLUMN IF EXISTS crossmatch_result")

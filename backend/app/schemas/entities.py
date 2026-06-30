@@ -48,7 +48,7 @@ class StaffCreate(_Base):
     name: str
     email: EmailStr
     phone: str | None = None
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=128)
     designation: str = "general"
     permissions: dict = {}
     is_master_user: bool = False
@@ -60,7 +60,7 @@ class StaffUpdate(_Base):
     designation: str | None = None
     permissions: dict | None = None
     is_master_user: bool | None = None
-    password: str | None = Field(default=None, min_length=8)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 # ---------- Camp ----------

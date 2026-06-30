@@ -13,7 +13,10 @@ from faker import Faker
 
 from app.core.config import settings
 from app.core.security import hash_password
-from app.db.session import SessionLocal, engine
+# Seeds run privileged: DDL (drop_all/create_all) and cross-tenant bulk inserts must
+# bypass RLS, so use the admin engine/session bound to DATABASE_URL, not the (possibly
+# RLS-restricted) runtime engine.
+from app.db.session import AdminSessionLocal as SessionLocal, admin_engine as engine
 from app.db.base import Base
 from app.models.audit import ActivityLog
 from app.models.camp import Camp, Donation, Donor, Vehicle
@@ -170,7 +173,7 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
 
     # ---- Donations + Bags + full lab pipeline for primary org so stock looks real ----
     bag_target = 320 if is_primary else 120
-    for _ in range(bag_target):
+    for bag_i in range(bag_target):
         donor = random.choice(donors)
         camp = random.choice(camps)
         bag_type = random.choice(BAG_TYPES)
@@ -185,7 +188,7 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
         )
         db.add(donation)
         bag = BloodBag(
-            bag_no=f"{org.id_prefix}26-D{random.randint(1000,9999)}", bag_type=bag_type,
+            bag_no=f"{org.id_prefix}26-D{1000 + bag_i:04d}", bag_type=bag_type,
             donor_id=donor.id, camp_id=camp.id, collection_date=coll,
             gross_volume_ml=random.choice([350, 450]),
             segment_no=f"SEG{random.randint(100,999)}", status="processed", org_id=org.id,
@@ -238,14 +241,16 @@ def seed_org(db, org: Organisation, *, is_primary: bool):
     #   - `in_processing` (bare) -> Component › Processing, Grouping › F/R, TTI › screening
     #   - `processed` + volumeless components -> Component › Volume
     inflight = 10 if is_primary else 5
+    w_seq = 0
     for grp_idx in range(inflight):
         for kind in ("collected", "in_processing", "volumeless"):
+            w_seq += 1
             donor = random.choice(donors)
             camp = random.choice(camps)
             bag_type = random.choice(BAG_TYPES)
             coll = date(2026, 6, 24) - timedelta(days=grp_idx % 3)
             bag = BloodBag(
-                bag_no=f"{org.id_prefix}26-W{random.randint(1000,9999)}", bag_type=bag_type,
+                bag_no=f"{org.id_prefix}26-W{1000 + w_seq:04d}", bag_type=bag_type,
                 donor_id=donor.id, camp_id=camp.id, collection_date=coll,
                 gross_volume_ml=random.choice([350, 450]),
                 status="collected" if kind == "collected" else (

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { useAuth } from "./lib/auth";
 import { LoginPage } from "./pages/LoginPage";
+import { OnboardPage } from "./pages/OnboardPage";
 
 // hero screens
 import { HomePage } from "./pages/HomePage";
@@ -42,6 +43,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/onboard" element={<OnboardPage />} />
       <Route path="/" element={<Protected><HomePage /></Protected>} />
       <Route path="/reception" element={<Protected><ReceptionPage /></Protected>} />
       <Route path="/reception/blood-request/invoice/:requestId" element={<Protected><InvoicePage /></Protected>} />

@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  BarChart3, Barcode, Bell, Boxes, Check, Droplet, FileText, FlaskConical,
-  LayoutDashboard, Pencil, Search, Settings as SettingsIcon, Trash2, UserPlus,
-  Users, Warehouse, Wrench,
+  BarChart3, Barcode, Bell, Boxes, Check, ChevronDown, Copy, Droplet, FileText, FlaskConical,
+  Info, LayoutDashboard, Link2, Minus, Pencil, Plus, Puzzle, Radio, Save, Search,
+  Settings as SettingsIcon, Trash2, UserPlus, Users, Wallet, Warehouse, Wrench, X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { canWrite } from "@/lib/rbac";
 import { useTheme } from "@/lib/theme";
-import { errorMessage, PrimaryButton, SectionBanner } from "@/components/ui";
+import { errorMessage, GhostButton, Modal, PrimaryButton, SectionBanner, StatusBadge } from "@/components/ui";
+import { DonorReportBuilder, mergeDonorReport, type DonorReportConfig } from "@/components/DonorReportBuilder";
 import {
   BILLING_FIELDS, COMPLIANCE_FLAGS, CUSTOM_SECTIONS, FULL_PRICING_ITEMS,
-  INTEGRATIONS_FIELDS, OPTIONS_FIELDS, PRICING_ITEMS, TABS,
-  type SettingField, type SettingsSection,
+  OPTIONS_LISTS, PRICING_ITEMS, TABS,
+  type OptionList, type SettingField, type SettingsSection,
 } from "@/lib/settingsConfig";
 
 const ICONS: Record<string, typeof SettingsIcon> = {
@@ -23,6 +24,20 @@ const ICONS: Record<string, typeof SettingsIcon> = {
 
 const lineInput =
   "w-full border-0 border-b border-line-chip bg-transparent px-0 py-2 text-[15px] text-ink outline-none transition focus:border-accent";
+
+/** A labelled underline input. Defined at module scope so its identity is
+ *  stable across renders — otherwise React remounts it on every keystroke
+ *  and the field loses focus after a single character. */
+function LineField({
+  label, type = "text", value, onChange,
+}: { label: string; type?: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-[13px] font-semibold text-muted">{label}</span>
+      <input type={type} className={lineInput} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  );
+}
 
 // ------------------------------------------------------------------ //
 
@@ -110,19 +125,19 @@ export function SettingsPage() {
             <CustomSettingsTab cust={cust} setCust={setCust} mayEdit={mayEdit} saving={saving} flash={flash} doSave={doSave} />
           )}
           {tab === "integrations" && (
-            <FieldListTab title="Integrations" section="integrations" fields={INTEGRATIONS_FIELDS}
+            <IntegrationsTab orgId={orgId}
               cust={cust} setCust={setCust} mayEdit={mayEdit} saving={saving} flash={flash} doSave={doSave} />
           )}
           {tab === "options" && (
-            <FieldListTab title="Options" section="options" fields={OPTIONS_FIELDS}
-              cust={cust} setCust={setCust} mayEdit={mayEdit} saving={saving} flash={flash} doSave={doSave} />
+            <OptionsTab cust={cust} setCust={setCust} mayEdit={mayEdit} saving={saving} flash={flash} doSave={doSave} />
           )}
           {tab === "billing" && (
             <FieldListTab title="Billing" section="billing" fields={BILLING_FIELDS}
               cust={cust} setCust={setCust} mayEdit={mayEdit} saving={saving} flash={flash} doSave={doSave} />
           )}
           {tab === "customisations" && (
-            <CustomisationsTab compliance={compliance} setCompliance={setCompliance}
+            <CustomisationsTab org={org} cust={cust} setCust={setCust}
+              compliance={compliance} setCompliance={setCompliance}
               mayEdit={mayEdit} saving={saving} flash={flash} doSave={doSave} />
           )}
         </div>
@@ -227,13 +242,6 @@ function GeneralTab({
   const [logoPreview, setLogoPreview] = useState<string>("");
   const set = (k: string, v: string) => setOrgForm((s) => ({ ...s, [k]: v }));
 
-  const Field = ({ k, label, type = "text" }: { k: string; label: string; type?: string }) => (
-    <label className="block">
-      <span className="mb-0.5 block text-[13px] font-semibold text-muted">{label}</span>
-      <input type={type} className={lineInput} value={orgForm[k] ?? ""} onChange={(e) => set(k, e.target.value)} />
-    </label>
-  );
-
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
       {/* 1. Organisation's Details */}
@@ -242,9 +250,9 @@ function GeneralTab({
         className="flex flex-col gap-4 rounded-card2 border border-line-card bg-card p-5 shadow-card"
       >
         <h3 className="font-display text-lg font-bold text-ink">1. Organisation's Details</h3>
-        <Field k="name" label="Name" />
-        <Field k="contact" label="Contact number" />
-        <Field k="license_no" label="License no" />
+        <LineField label="Name" value={orgForm.name} onChange={(v) => set("name", v)} />
+        <LineField label="Contact number" value={orgForm.contact} onChange={(v) => set("contact", v)} />
+        <LineField label="License no" value={orgForm.license_no} onChange={(v) => set("license_no", v)} />
         <label className="block">
           <span className="mb-0.5 block text-[13px] font-semibold text-muted">Address</span>
           <textarea rows={2} className={lineInput} value={orgForm.address ?? ""} onChange={(e) => set("address", e.target.value)} />
@@ -264,10 +272,10 @@ function GeneralTab({
         className="flex flex-col gap-4 rounded-card2 border border-line-card bg-card p-5 shadow-card"
       >
         <h3 className="font-display text-lg font-bold text-ink">2. Additional Details</h3>
-        <Field k="website" label="Website" />
-        <Field k="email" label="Email" type="email" />
-        <Field k="id_prefix" label="Id prefix" />
-        <Field k="billing_prefix" label="Billing prefix" />
+        <LineField label="Website" value={orgForm.website} onChange={(v) => set("website", v)} />
+        <LineField label="Email" type="email" value={orgForm.email} onChange={(v) => set("email", v)} />
+        <LineField label="Id prefix" value={orgForm.id_prefix} onChange={(v) => set("id_prefix", v)} />
+        <LineField label="Billing prefix" value={orgForm.billing_prefix} onChange={(v) => set("billing_prefix", v)} />
         <p className="text-[12.5px] leading-snug text-muted">
           Optional prefix for invoice numbers. Use [year] to insert the last two digits of the current year. Example: 'INV-[year]' → 'INV-25'.
         </p>
@@ -482,15 +490,373 @@ function FieldListTab({
 }
 
 // ------------------------------------------------------------------ //
+// Options tab (editable master lists rendered as chips)              //
+// ------------------------------------------------------------------ //
+
+/** Green rounded-square "+" button that heads each list section. */
+function AddSquare({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#27C9A7] text-white shadow-sm transition hover:brightness-105">
+      <Plus size={17} strokeWidth={2.5} />
+    </button>
+  );
+}
+
+/** One value chip — solid indigo pill (filled) or light removable chip (outline). */
+function OptionChip({
+  label, variant, editable, mayEdit, onRemove, onRename,
+}: {
+  label: string; variant: "filled" | "outline"; editable?: boolean; mayEdit: boolean;
+  onRemove: () => void; onRename: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => { setEditing(false); const v = draft.trim(); if (v && v !== label) onRename(v); else setDraft(label); }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setDraft(label); setEditing(false); } }}
+        className="rounded-full border border-[#6366F1] bg-white px-4 py-2 text-[14px] font-semibold text-[#4338CA] outline-none focus:ring-2 focus:ring-[#6366F1]/30"
+      />
+    );
+  }
+
+  if (variant === "filled") {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full bg-[#6366F1] px-4 py-2 text-[14px] font-semibold text-white">
+        {editable ? (
+          <button type="button" disabled={!mayEdit} onClick={() => mayEdit && setEditing(true)}
+            className="text-white/90 transition hover:text-white disabled:opacity-50" title="Rename">
+            <Pencil size={13} />
+          </button>
+        ) : (
+          <button type="button" disabled={!mayEdit} onClick={onRemove}
+            className="text-white/90 transition hover:text-white disabled:opacity-50" title="Remove">
+            <X size={14} strokeWidth={2.5} />
+          </button>
+        )}
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-[#F1F0FB] px-4 py-2 text-[14px] font-medium text-[#4F46E5]">
+      <button type="button" disabled={!mayEdit} onClick={onRemove}
+        className="text-[#9A95E8] transition hover:text-[#4F46E5] disabled:opacity-50" title="Remove">
+        <X size={14} strokeWidth={2.5} />
+      </button>
+      {editable ? (
+        <button type="button" disabled={!mayEdit} onClick={() => mayEdit && setEditing(true)} className="disabled:opacity-50">{label}</button>
+      ) : label}
+    </span>
+  );
+}
+
+/** A single master-list section: header + add input + chip cloud. */
+function OptionSection({
+  list, values, mayEdit, onChange,
+}: { list: OptionList; values: string[]; mayEdit: boolean; onChange: (next: string[]) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const commit = () => {
+    const v = draft.trim();
+    if (v && !values.some((x) => x.toLowerCase() === v.toLowerCase())) onChange([...values, v]);
+    setDraft("");
+    setAdding(false);
+  };
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2.5">
+        <AddSquare onClick={() => { if (mayEdit) setAdding((a) => !a); }} />
+        <span className={`font-display text-[16px] font-bold ${list.variant === "filled" && list.editable ? "text-[#4F46E5]" : "text-ink-2"}`}>
+          {list.label}
+        </span>
+        {list.sublabel && (
+          <span className="rounded-md bg-neutralpill-bg px-2 py-0.5 text-[11px] font-semibold text-muted">{list.sublabel}</span>
+        )}
+      </div>
+
+      {adding && (
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setDraft(""); setAdding(false); } }}
+            placeholder={list.placeholder ?? "Add value…"}
+            className="w-72 rounded-full border border-line-chip bg-page px-4 py-2 text-[14px] text-ink outline-none focus:ring-2 focus:ring-accent/30"
+          />
+          <button type="button" onClick={commit}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-bold text-white shadow-primary transition hover:brightness-110">
+            <Plus size={15} /> Add
+          </button>
+          <button type="button" onClick={() => { setDraft(""); setAdding(false); }}
+            className="text-[13px] font-semibold text-muted hover:text-ink-4">Cancel</button>
+        </div>
+      )}
+
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-3">
+          {values.map((label, i) => (
+            <OptionChip
+              key={`${label}-${i}`} label={label} variant={list.variant} editable={list.editable} mayEdit={mayEdit}
+              onRemove={() => onChange(values.filter((_, j) => j !== i))}
+              onRename={(next) => onChange(values.map((v, j) => (j === i ? next : v)))}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function OptionsTab({
+  cust, setCust, mayEdit, saving, flash, doSave,
+}: SharedProps & { cust: Record<string, any>; setCust: React.Dispatch<React.SetStateAction<Record<string, any>>> }) {
+  const valuesFor = (list: OptionList): string[] =>
+    Array.isArray(cust[list.key]) ? cust[list.key] : list.items;
+  const setValuesFor = (list: OptionList, next: string[]) =>
+    setCust((s) => ({ ...s, [list.key]: next }));
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); doSave("options", { settings: cust }); }} className="space-y-2">
+      <h2 className="mb-5 font-display text-xl font-bold text-ink">Options</h2>
+      <div className="space-y-9">
+        {OPTIONS_LISTS.map((list) => (
+          <OptionSection key={list.key} list={list} values={valuesFor(list)} mayEdit={mayEdit}
+            onChange={(next) => setValuesFor(list, next)} />
+        ))}
+      </div>
+      <div className="sticky bottom-0 mt-8 flex items-center gap-3 border-t border-line-table bg-card/90 py-4 backdrop-blur">
+        <SaveBar section="options" saving={saving("options")} flash={flash} mayEdit={mayEdit} label="Save Options" />
+      </div>
+    </form>
+  );
+}
+
+// ------------------------------------------------------------------ //
+// Integrations tab (connector cards)                                 //
+// ------------------------------------------------------------------ //
+
+/** Format the org id into a grouped, copyable private key. */
+function formatPrivateKey(orgId?: string) {
+  if (!orgId) return "—";
+  const hex = orgId.replace(/[^0-9a-f]/gi, "").toLowerCase();
+  if (hex.length < 12) return orgId;
+  return `${hex.slice(0, 3)}-${hex.slice(3, 7)}-${hex.slice(7, 11)}-c-${hex.slice(11, 14)}`;
+}
+
+/** A collapsible connector card with a chain icon and +/− toggle. */
+function IntegrationCard({
+  icon, title, open, onToggle, children,
+}: { icon: React.ReactNode; title: string; open: boolean; onToggle: () => void; children?: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-card2 border border-line-card bg-card shadow-card">
+      <button type="button" onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
+        <span className="flex items-center gap-2.5 font-display text-[15px] font-bold text-ink">
+          <span className="text-muted [&>svg]:h-4 [&>svg]:w-4">{icon}</span> {title}
+        </span>
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-muted">
+          {open ? <Minus size={18} /> : <Plus size={18} />}
+        </span>
+      </button>
+      {open && <div className="border-t border-line-table px-5 py-5">{children}</div>}
+    </div>
+  );
+}
+
+/** Read-only key with a copy button. */
+function KeyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-line-table pb-4">
+      <div className="min-w-0">
+        <div className="text-[13px] font-semibold text-muted">{label}</div>
+        <div className="mt-1 truncate font-mono text-[15px] text-ink">{value}</div>
+      </div>
+      <button type="button" onClick={copy} title="Copy"
+        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-hovertint hover:text-ink">
+        {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+      </button>
+    </div>
+  );
+}
+
+function IntegrationsTab({
+  orgId, cust, setCust, mayEdit, saving, flash, doSave,
+}: SharedProps & {
+  orgId?: string;
+  cust: Record<string, any>; setCust: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+}) {
+  const [open, setOpen] = useState<Record<string, boolean>>({ bloodbank: true });
+  const toggleOpen = (k: string) => setOpen((s) => ({ ...s, [k]: !s[k] }));
+  const set = (k: string, v: any) => setCust((s) => ({ ...s, [k]: v }));
+  const val = (k: string, d = "") => (cust[k] ?? d) as string;
+
+  const privateKey = cust.integration_private_key || formatPrivateKey(orgId);
+  const connected: string[] = Array.isArray(cust.integration_connected_banks) ? cust.integration_connected_banks : [];
+  const [bankKey, setBankKey] = useState("");
+  const integrate = () => {
+    const k = bankKey.trim();
+    if (!k) return;
+    set("integration_connected_banks", [...connected, k]);
+    setBankKey("");
+  };
+
+  const labelCls = "mb-1 block text-[13px] font-semibold text-muted";
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); doSave("integrations", { settings: cust }); }} className="space-y-5">
+      <div className="columns-1 gap-5 lg:columns-3 [&>*]:mb-5 [&>*]:break-inside-avoid">
+        {/* Blood Bank Integration */}
+        <IntegrationCard icon={<Link2 />} title="Blood Bank Integration"
+          open={!!open.bloodbank} onToggle={() => toggleOpen("bloodbank")}>
+          <KeyField label="Private Key" value={privateKey} />
+          <div className="mt-4 grid grid-cols-[120px_1fr] items-center gap-3">
+            <span className="text-[13px] font-semibold text-muted">Integrate Blood Bank</span>
+            <input value={bankKey} onChange={(e) => setBankKey(e.target.value)} placeholder="Enter Private Key"
+              disabled={!mayEdit} className={lineInput} />
+          </div>
+          <button type="button" onClick={integrate} disabled={!mayEdit || !bankKey.trim()}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-2.5 text-sm font-bold text-white shadow-primary transition hover:brightness-110 disabled:opacity-50">
+            <Save size={15} /> Integrate
+          </button>
+          <div className="mt-5 border-t border-line-table pt-4">
+            {connected.length === 0 ? (
+              <div className="flex items-center justify-center gap-1.5 text-[13px] text-muted">
+                <Info size={14} /> No connected blood banks yet
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {connected.map((k, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-page px-3 py-2 text-[13px]">
+                    <span className="truncate font-mono text-ink">{k}</span>
+                    <button type="button" disabled={!mayEdit}
+                      onClick={() => set("integration_connected_banks", connected.filter((_, j) => j !== i))}
+                      className="text-accent hover:underline disabled:opacity-50">Remove</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </IntegrationCard>
+
+        {/* NEO Grouping Integration */}
+        <IntegrationCard icon={<Link2 />} title="NEO Grouping Integration"
+          open={!!open.neo} onToggle={() => toggleOpen("neo")}>
+          <div className="flex items-center justify-between gap-4 pb-4">
+            <div className="text-[14px] font-semibold text-ink">Enable NEO blood grouping machine</div>
+            <Switch on={!!cust.integration_neo} disabled={!mayEdit} onChange={() => set("integration_neo", !cust.integration_neo)} />
+          </div>
+          <label className="block">
+            <span className={labelCls}>Machine endpoint (IP / port)</span>
+            <input value={val("integration_neo_endpoint")} disabled={!mayEdit}
+              onChange={(e) => set("integration_neo_endpoint", e.target.value)} placeholder="e.g. 192.168.1.50:9100" className={lineInput} />
+          </label>
+        </IntegrationCard>
+
+        {/* RFID Integration */}
+        <IntegrationCard icon={<Radio />} title="RFID Integration"
+          open={!!open.rfid} onToggle={() => toggleOpen("rfid")}>
+          <div className="flex items-center justify-between gap-4 pb-4">
+            <div className="text-[14px] font-semibold text-ink">Enable RFID bag tracking</div>
+            <Switch on={!!cust.integration_rfid} disabled={!mayEdit} onChange={() => set("integration_rfid", !cust.integration_rfid)} />
+          </div>
+          <label className="block">
+            <span className={labelCls}>Reader endpoint</span>
+            <input value={val("integration_rfid_endpoint")} disabled={!mayEdit}
+              onChange={(e) => set("integration_rfid_endpoint", e.target.value)} placeholder="e.g. 192.168.1.60:14150" className={lineInput} />
+          </label>
+        </IntegrationCard>
+
+        {/* API Access */}
+        <IntegrationCard icon={<Link2 />} title="API Access"
+          open={!!open.api} onToggle={() => toggleOpen("api")}>
+          <div className="flex items-center justify-between gap-4 pb-4">
+            <div className="text-[14px] font-semibold text-ink">Enable REST API access</div>
+            <Switch on={!!cust.integration_api_enabled} disabled={!mayEdit} onChange={() => set("integration_api_enabled", !cust.integration_api_enabled)} />
+          </div>
+          <KeyField label="API Key" value={privateKey} />
+          <p className="mt-3 text-[12.5px] leading-snug text-muted">
+            Use this key as the <span className="font-mono">X-API-Key</span> header to access the public API.
+          </p>
+        </IntegrationCard>
+
+        {/* eRakt Kosh Integration */}
+        <IntegrationCard icon={<Puzzle />} title="eRakt Kosh Integration"
+          open={!!open.erakt} onToggle={() => toggleOpen("erakt")}>
+          <div className="flex items-center justify-between gap-4 pb-4">
+            <div className="text-[14px] font-semibold text-ink">Sync stock & donations with e-Rakt-Kosh</div>
+            <Switch on={!!cust.integration_eraktkosh} disabled={!mayEdit} onChange={() => set("integration_eraktkosh", !cust.integration_eraktkosh)} />
+          </div>
+          <label className="block">
+            <span className={labelCls}>e-Rakt-Kosh API Key</span>
+            <input value={val("integration_eraktkosh_key")} disabled={!mayEdit}
+              onChange={(e) => set("integration_eraktkosh_key", e.target.value)} placeholder="Paste API key" className={lineInput} />
+          </label>
+        </IntegrationCard>
+      </div>
+
+      <SaveBar section="integrations" saving={saving("integrations")} flash={flash} mayEdit={mayEdit} />
+    </form>
+  );
+}
+
+// ------------------------------------------------------------------ //
 // Customisations tab (compliance flags + theme)                      //
 // ------------------------------------------------------------------ //
 
 function CustomisationsTab({
-  compliance, setCompliance, mayEdit, saving, flash, doSave,
-}: SharedProps & { compliance: Record<string, boolean>; setCompliance: React.Dispatch<React.SetStateAction<Record<string, boolean>>> }) {
+  org, cust, setCust, compliance, setCompliance, mayEdit, saving, flash, doSave,
+}: SharedProps & {
+  org: Record<string, any>;
+  cust: Record<string, any>; setCust: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  compliance: Record<string, boolean>; setCompliance: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}) {
   const { dark, toggle } = useTheme();
+  const [reportKind, setReportKind] = useState("donor");
+  const donorReport: DonorReportConfig = useMemo(() => mergeDonorReport(cust.donor_report), [cust.donor_report]);
+  const setDonorReport = (next: DonorReportConfig) => setCust((s) => ({ ...s, donor_report: next }));
+
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-8">
+      {/* ---- Report builder ---- */}
+      <form onSubmit={(e) => { e.preventDefault(); doSave("donor_report", { settings: cust }); }} className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-xl font-bold text-ink">Report Customisations</h2>
+        </div>
+        <div className="relative max-w-md">
+          <select
+            value={reportKind}
+            onChange={(e) => setReportKind(e.target.value)}
+            className="w-full appearance-none rounded-xl border border-line-chip bg-card px-4 py-3 text-[15px] font-bold text-ink shadow-card outline-none focus:ring-2 focus:ring-accent/30"
+          >
+            <option value="donor">Donor report</option>
+          </select>
+          <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted" />
+        </div>
+
+        <DonorReportBuilder config={donorReport} onChange={setDonorReport} org={org} disabled={!mayEdit} />
+
+        <div className="flex justify-center pt-1">
+          <SaveBar section="donor_report" saving={saving("donor_report")} flash={flash} mayEdit={mayEdit} label="Save Report Layout" />
+        </div>
+      </form>
+
+      {/* ---- Compliance + theme ---- */}
+      <div className="max-w-3xl space-y-6 border-t border-line-table pt-8">
       <form onSubmit={(e) => { e.preventDefault(); doSave("compliance", { compliance_flags: compliance }); }}>
         <h2 className="mb-2 font-display text-xl font-bold text-ink">Compliance &amp; Accreditation</h2>
         <p className="mb-2 text-[13px] text-muted">Display-only labels shown on reports & invoices.</p>
@@ -513,6 +879,7 @@ function CustomisationsTab({
           </div>
           <Switch on={dark} onChange={toggle} />
         </div>
+      </div>
       </div>
     </div>
   );

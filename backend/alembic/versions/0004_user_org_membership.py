@@ -20,29 +20,31 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "user_orgs",
-        sa.Column("id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("user_id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("org_id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
-        sa.ForeignKeyConstraint(["org_id"], ["organisations.id"]),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id", "org_id", name="uq_user_orgs_user_org"),
+    # IF NOT EXISTS guards so the chain stays composable on a fresh DB, where 0001's
+    # create_all already built the table/indexes from the current models.
+    op.execute(
+        "CREATE TABLE IF NOT EXISTS user_orgs ("
+        "  id uuid PRIMARY KEY,"
+        "  user_id uuid NOT NULL REFERENCES users(id),"
+        "  org_id uuid NOT NULL REFERENCES organisations(id),"
+        "  created_at timestamptz NOT NULL DEFAULT now(),"
+        "  updated_at timestamptz NOT NULL DEFAULT now(),"
+        "  CONSTRAINT uq_user_orgs_user_org UNIQUE (user_id, org_id)"
+        ")"
     )
-    op.create_index("ix_user_orgs_user_id", "user_orgs", ["user_id"])
-    op.create_index("ix_user_orgs_org_id", "user_orgs", ["org_id"])
+    op.execute("CREATE INDEX IF NOT EXISTS ix_user_orgs_user_id ON user_orgs (user_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_user_orgs_org_id ON user_orgs (org_id)")
 
-    # Backfill: every existing user is a member of their home org.
+    # Backfill: every existing user is a member of their home org. ON CONFLICT keeps it
+    # idempotent (no-op on a fresh DB that has no users yet, or on re-run).
     op.execute(
         "INSERT INTO user_orgs (id, user_id, org_id, created_at, updated_at) "
-        "SELECT gen_random_uuid(), id, org_id, now(), now() FROM users"
+        "SELECT gen_random_uuid(), id, org_id, now(), now() FROM users "
+        "ON CONFLICT (user_id, org_id) DO NOTHING"
     )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_user_orgs_org_id", table_name="user_orgs")
-    op.drop_index("ix_user_orgs_user_id", table_name="user_orgs")
-    op.drop_table("user_orgs")
+    op.execute("DROP INDEX IF EXISTS ix_user_orgs_org_id")
+    op.execute("DROP INDEX IF EXISTS ix_user_orgs_user_id")
+    op.execute("DROP TABLE IF EXISTS user_orgs")

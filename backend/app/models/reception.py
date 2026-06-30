@@ -1,7 +1,9 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    Boolean, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,6 +12,14 @@ from app.db.base import Base, OrgScopedMixin, SoftDeleteMixin, TimestampMixin, U
 
 class BloodRequest(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, Base):
     __tablename__ = "blood_requests"
+    # The human request id (e.g. ACBC26-R00618) is a business identifier — unique per org
+    # among live rows so the counter can never hand out a duplicate.
+    __table_args__ = (
+        Index(
+            "uq_blood_requests_org_request_id", "org_id", "request_id",
+            unique=True, postgresql_where=text("is_deleted = false"),
+        ),
+    )
     request_id: Mapped[str] = mapped_column(String(40), index=True, nullable=False)  # ACBC26-R00618
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     # blood | bulk | fractionation | inward
@@ -34,6 +44,12 @@ class BloodRequest(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, B
 
 class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, Base):
     __tablename__ = "invoices"
+    __table_args__ = (
+        Index(
+            "uq_invoices_org_invoice_no", "org_id", "invoice_no",
+            unique=True, postgresql_where=text("is_deleted = false"),
+        ),
+    )
     invoice_no: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     name: Mapped[str | None] = mapped_column(String(200))

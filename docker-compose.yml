@@ -21,10 +21,15 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be set (e.g. in .env)}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (e.g. in .env)}@db:5432/${POSTGRES_DB:?POSTGRES_DB must be set (e.g. in .env)}
+      # Honors DATABASE_URL from .env (e.g. Supabase). Falls back to the local db service
+      # when unset, so plain local dev still works with no .env DATABASE_URL.
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be set (e.g. in .env)}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (e.g. in .env)}@db:5432/${POSTGRES_DB:?POSTGRES_DB must be set (e.g. in .env)}}
+      # Optional restricted-role URL for RLS enforcement (see .env.example). Empty → owner.
+      APP_DATABASE_URL: ${APP_DATABASE_URL:-}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (e.g. in .env) — no insecure default}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set (e.g. in .env) — no localhost default}
       SEED_ON_START: ${SEED_ON_START:?SEED_ON_START must be set explicitly (use false in production)}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     depends_on:
       db:
         condition: service_healthy

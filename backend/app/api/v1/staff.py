@@ -81,10 +81,19 @@ def update_staff(user_id: uuid.UUID, payload: StaffUpdate, db: Session = Depends
     if u is None or u.org_id != org.id or u.is_deleted:
         raise HTTPException(404, "Staff not found")
     data = payload.model_dump(exclude_unset=True)
+    # Changing a password or a user's privileges must invalidate their existing
+    # tokens, otherwise a demoted/locked-out user keeps their old access until expiry.
+    revoke = (
+        "password" in data
+        or ("designation" in data and data["designation"] != u.designation)
+        or ("is_master_user" in data and data["is_master_user"] != u.is_master_user)
+    )
     if "password" in data:
         u.password_hash = hash_password(data.pop("password"))
     for k, v in data.items():
         setattr(u, k, v)
+    if revoke:
+        u.token_version = (u.token_version or 0) + 1
     db.commit()
     db.refresh(u)
     return _ser(u)

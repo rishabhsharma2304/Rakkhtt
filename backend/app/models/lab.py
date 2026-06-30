@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,6 +10,14 @@ from app.db.base import Base, OrgScopedMixin, SoftDeleteMixin, TimestampMixin, U
 
 class BloodBag(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, Base):
     __tablename__ = "blood_bags"
+    # A bag number is the physical barcode — it must never collide within an org. Partial
+    # unique (live rows only) so a number freed by a soft-delete can be reissued.
+    __table_args__ = (
+        Index(
+            "uq_blood_bags_org_bag_no", "org_id", "bag_no",
+            unique=True, postgresql_where=text("is_deleted = false"),
+        ),
+    )
     bag_no: Mapped[str] = mapped_column(String(60), index=True, nullable=False)  # barcode
     bag_type: Mapped[str] = mapped_column(String(30), nullable=False)  # DB-SAGM-350, TB-SAGM-450...
     donor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("donors.id"), index=True)

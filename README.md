@@ -53,6 +53,29 @@ Blood Bank (JDBB)** — switch between them with the centre selector in the top 
 query is scoped to the active centre. Each centre also has technician / supervisor /
 motivation / general staff (`<designation>.<prefix>@example.in` / `password123`).
 
+## Sign in with Google & self-serve onboarding
+
+A new operator can sign up for their **own** blood centre with no manual provisioning —
+Google Sign-In is free (OAuth 2.0 / OpenID Connect, no per-login cost).
+
+**Setup (once, by the app owner):**
+
+1. In **Google Cloud Console → APIs & Services → Credentials**, create an **OAuth 2.0
+   Client ID** of type **Web application**.
+2. Add your frontend URL(s) to **Authorized JavaScript origins** (e.g.
+   `http://localhost:5173` for dev, `https://app.example.com` for prod).
+3. Put the client ID in `.env` as `GOOGLE_CLIENT_ID=...`. That single value enables the
+   button in the UI **and** the server-side ID-token verification. Leave it blank to run
+   email/password only.
+
+**Flow:** the browser gets a Google ID token → `POST /auth/google` verifies it against
+`GOOGLE_CLIENT_ID`. If the email already has an account it logs straight in (and links
+Google to a pre-existing password account on first use). If it's a brand-new user, the
+API returns a short-lived registration token and the app shows the **onboarding** screen
+(`/onboard`): the user names their blood centre and is created as its **master user**
+(own `org_id`, full RBAC). No password is stored for Google accounts (`password_hash`
+is nullable; `auth_provider = "google"`).
+
 ## Running locally without Docker
 
 **Backend**

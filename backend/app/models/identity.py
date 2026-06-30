@@ -32,11 +32,21 @@ class User(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     phone: Mapped[str | None] = mapped_column(String(40))
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Nullable: Google-authenticated users have no local password.
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    # "password" | "google" — how this account signs in.
+    auth_provider: Mapped[str] = mapped_column(String(20), default="password", nullable=False)
+    # Google subject id (the stable `sub` claim). Unique when present; many NULLs
+    # are allowed by Postgres for password accounts.
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512))
     # technician | technical_supervisor | motivation | general | master_user | admin
     designation: Mapped[str] = mapped_column(String(40), default="general", nullable=False)
     permissions: Mapped[dict] = mapped_column(JSONB, default=dict)
     is_master_user: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Bumped whenever the account's auth changes (password/role change, logout-all) so
+    # every previously-issued access token carrying an older value stops validating.
+    token_version: Mapped[int] = mapped_column(default=0, nullable=False)
     org_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organisations.id"), nullable=False, index=True
     )

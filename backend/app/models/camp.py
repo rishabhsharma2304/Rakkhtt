@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,6 +30,14 @@ class Camp(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, Base):
 
 class Donor(UUIDMixin, TimestampMixin, SoftDeleteMixin, OrgScopedMixin, Base):
     __tablename__ = "donors"
+    # When a govt ID is supplied it's a real identity — no two live donors in an org may
+    # share one. Partial so the many NULL (no-id) donors are exempt, not collapsed together.
+    __table_args__ = (
+        Index(
+            "uq_donors_org_govt_id", "org_id", "govt_id",
+            unique=True, postgresql_where=text("govt_id IS NOT NULL AND is_deleted = false"),
+        ),
+    )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     dob: Mapped[date | None] = mapped_column(Date)
     age: Mapped[int | None] = mapped_column(Integer)
