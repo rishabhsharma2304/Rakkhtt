@@ -1,6 +1,7 @@
 """Import all models here so Alembic autogenerate and Base.metadata see them."""
 from app.models.identity import Organisation, User  # noqa: F401
 from app.models.audit import ActivityLog  # noqa: F401
+from app.models.counters import OrgCounter  # noqa: F401
 from app.models.camp import Vehicle, Camp, Donor, Donation  # noqa: F401
 from app.models.lab import (  # noqa: F401
     BloodBag,

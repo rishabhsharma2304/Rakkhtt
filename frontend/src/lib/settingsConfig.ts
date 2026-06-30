@@ -126,10 +126,13 @@ export const CUSTOM_SECTIONS: SettingsSection[] = [
     label: "Dashboard Settings",
     icon: "LayoutDashboard",
     fields: [
-      { kind: "toggle", key: "dashboard_show_stock_summary", label: "Show Stock Summary Cards", desc: "Display the component-wise stock summary cards on the dashboard.", default: true },
-      { kind: "toggle", key: "dashboard_show_expiry_alerts", label: "Show Expiry Alerts", desc: "Highlight components nearing expiry on the dashboard." , default: true },
-      { kind: "toggle", key: "dashboard_show_camp_widget", label: "Show Upcoming Camps Widget", desc: "Display upcoming camps on the dashboard home." },
-      { kind: "toggle", key: "dashboard_show_low_stock_banner", label: "Show Low Stock Banner", desc: "Display a banner when any blood group falls below the threshold." },
+      { kind: "toggle", key: "dashboard_multi_view", label: "Multi Dashboard View", desc: "If enabled, master users can see a unified dashboard across their connected blood banks" },
+      { kind: "toggle", key: "dashboard_display_news", label: "Display News", desc: "Show news scrolling on the dashboard.", default: true },
+      { kind: "toggle", key: "dashboard_display_components_issued", label: "Display Components Issued", desc: "Show the Components Issued card on the dashboard.", default: true },
+      { kind: "toggle", key: "dashboard_display_current_stock", label: "Display Current Stock", desc: "Show the Current Stock card on the dashboard.", default: true },
+      { kind: "toggle", key: "dashboard_display_total_revenue", label: "Display Total Revenue", desc: "Show financial data (monthly earnings till date) on dashboard.", default: true },
+      { kind: "toggle", key: "dashboard_display_work_completed_today", label: "Display Total Work Completed Today", desc: "Show the Total Work Completed Today card on the dashboard.", default: true },
+      { kind: "toggle", key: "dashboard_display_expiring_soon", label: "Display Expiring Soon", desc: "Show the Expiring Soon card on the dashboard.", default: true },
     ],
   },
   {
@@ -137,10 +140,12 @@ export const CUSTOM_SECTIONS: SettingsSection[] = [
     label: "Donor Settings",
     icon: "UserPlus",
     fields: [
-      { kind: "toggle", key: "donor_mandatory_id_proof", label: "Mandatory ID Proof", desc: "Require an ID proof while registering a new donor." },
-      { kind: "toggle", key: "donor_send_thankyou_sms", label: "Send Thank-You SMS", desc: "Automatically send a thank-you message after donation." },
-      { kind: "toggle", key: "donor_show_last_donation", label: "Show Last Donation Date", desc: "Display the donor's last donation date in the donor list." , default: true },
-      { kind: "number", key: "donor_min_gap_days", label: "Minimum Gap Between Donations (days)", desc: "Block re-donation before this many days have passed.", default: 90 },
+      { kind: "toggle", key: "donor_govt_id_mandatory", label: "Make Govt ID mandatory for Donor Form", desc: "If enabled, the staff must fill the Govt ID before saving donor form." },
+      { kind: "toggle", key: "donor_contact_mandatory", label: "Make Contact Number mandatory for Donor Form", desc: "If enabled, staff must fill the contact number before saving donor form." },
+      { kind: "toggle", key: "donor_display_date_filter", label: "Display date filter", desc: "If enabled, date range filtering of records will happen in donor and reception sections." },
+      { kind: "toggle", key: "donor_display_digital_signature", label: "Display Digital Signature", desc: "If enabled, donor digital signature page will be visible for donor while filling details.", default: true },
+      { kind: "toggle", key: "donor_display_questionnaire", label: "Display Donor Questionnaire", desc: "If enabled, donor questionnaire button will be visible in Invitations detail page.", default: true },
+      { kind: "select", key: "donor_report_delay_days", label: "Donor Report Delay In Days", desc: "Choose how many days after donation to send donor blood report notifications on (SMS, email, WhatsApp).", options: ["0 days", "1 day", "3 days", "7 days", "14 days", "30 days"], default: "7 days" },
     ],
   },
   {
@@ -148,9 +153,13 @@ export const CUSTOM_SECTIONS: SettingsSection[] = [
     label: "Grouping Settings",
     icon: "Users",
     fields: [
-      { kind: "toggle", key: "grouping_double_entry", label: "Require Double Entry", desc: "Require two independent entries for blood grouping confirmation." },
-      { kind: "toggle", key: "grouping_show_rh_subtype", label: "Show Rh Subtype", desc: "Capture Rh subtype (Du / weak D) during grouping." },
-      { kind: "toggle", key: "grouping_auto_flag_discrepancy", label: "Auto-flag Discrepancy", desc: "Flag a unit for review when forward and reverse grouping disagree.", default: true },
+      { kind: "toggle", key: "grouping_combine_forward_reverse", label: "Combine Forward and Reverse Grouping", desc: "This displays Forward and Reverse Grouping combined on the same page.", default: true },
+      { kind: "toggle", key: "grouping_phenotyping", label: "Phenotyping", desc: "Allows to do phenotyping of the blood." },
+      { kind: "toggle", key: "grouping_show_full_blood_group", label: "Show Full Blood Group in PLC, FFP, SDP", desc: "This displays full blood group (including RH factor) for PLC, FFP, SDP." },
+      { kind: "toggle", key: "grouping_validation_authorized_only", label: "Enable Grouping Validation For Authorized Users Only", desc: "Enable this option to restrict grouping validation to users who have the necessary permissions." },
+      { kind: "toggle", key: "grouping_autofill_from_segment", label: "Auto Fill Forward/Reverse grouping Based On Segment Grouping", desc: "If enabled, Forward/Reverse grouping will be automatically saved while saving segment grouping." },
+      { kind: "toggle", key: "grouping_show_bombay_blood_group", label: "Show Bombay Blood Group", desc: "We can enable this if the requirement of blood request is Bombay blood group." },
+      { kind: "select", key: "grouping_report_based_on", label: "Show Grouping report based on", desc: "Choose whether grouping reports use collection date or grouping date.", options: ["Collection Date", "Grouping Date"], default: "Collection Date" },
     ],
   },
   {
@@ -158,8 +167,21 @@ export const CUSTOM_SECTIONS: SettingsSection[] = [
     label: "ID Settings",
     icon: "Barcode",
     fields: [
-      { kind: "text", key: "id_donor_prefix", label: "Donor ID Prefix", placeholder: "e.g. D" },
-      { kind: "text", key: "id_request_prefix", label: "Blood Request ID Prefix", placeholder: "e.g. R" },
+      { kind: "toggle", key: "id_donor_check", label: "Donor ID Check", desc: "When enabled, donor IDs are validated against the length set below." },
+      { kind: "number", key: "id_donor_length", label: "Donor ID Length", desc: "Expected number of characters for a donor ID when ID check is on.", default: 5 },
+      { kind: "toggle", key: "id_defer_donor_check", label: "Defer Donor ID Check", desc: "When enabled, defer donor IDs are validated against the length set below." },
+      { kind: "number", key: "id_defer_donor_length", label: "Defer Donor ID Length", desc: "Expected number of characters for a defer donor ID when ID check is on.", default: 5 },
+      { kind: "toggle", key: "id_blood_request_check", label: "Blood Request ID Check", desc: "When enabled, blood request IDs are validated against the length set below." },
+      { kind: "number", key: "id_blood_request_length", label: "Blood Request ID Length", desc: "Expected number of characters for a blood request ID when ID check is on.", default: 5 },
+      { kind: "toggle", key: "id_bulk_request_check", label: "Bulk Request ID Check", desc: "When enabled, bulk blood request IDs are validated against the length set below." },
+      { kind: "number", key: "id_bulk_request_length", label: "Bulk Request ID Length", desc: "Expected number of characters for a bulk request ID when ID check is on.", default: 5 },
+      { kind: "toggle", key: "id_fractionation_request_check", label: "Fractionation Request ID Check", desc: "When enabled, fractionation request IDs are validated against the length set below." },
+      { kind: "number", key: "id_fractionation_request_length", label: "Fractionation Request ID Length", desc: "Expected number of characters for a fractionation request ID when ID check is on.", default: 5 },
+      { kind: "toggle", key: "id_bag_check", label: "Blood Bag ID Check", desc: "When enabled, blood bag IDs are validated against the length set below." },
+      { kind: "number", key: "id_bag_length", label: "Blood Bag ID Length", desc: "Expected number of characters for a blood bag ID when ID check is on.", default: 5 },
+      { kind: "toggle", key: "id_fix_prefix", label: "Fix ID prefix", desc: "If enabled, the prefix part of IDs is auto-fixed and users can only modify the remaining part." },
+      { kind: "text", key: "id_donor_prefix", label: "Donor ID Prefix", desc: "Prefix automatically prepended to every donor ID.", placeholder: "e.g. D" },
+      { kind: "text", key: "id_request_prefix", label: "Blood Request ID Prefix", desc: "Prefix automatically prepended to every blood request ID.", placeholder: "e.g. R" },
       { kind: "toggle", key: "id_reset_yearly", label: "Reset IDs Yearly", desc: "Restart sequential IDs at the beginning of each financial year." },
     ],
   },
@@ -248,6 +270,151 @@ export const OPTIONS_FIELDS: SettingField[] = [
   { kind: "select", key: "option_currency", label: "Currency", options: ["INR (₹)", "USD ($)", "AED (د.إ)"], default: "INR (₹)" },
   { kind: "toggle", key: "option_24h_time", label: "Use 24-hour time", desc: "Display time in 24-hour format throughout the app.", default: true },
   { kind: "toggle", key: "option_session_timeout", label: "Auto Logout on Idle", desc: "Log staff out automatically after a period of inactivity." },
+];
+
+// ------------------------------------------------------------------ //
+// Options tab — editable master lists rendered as chips              //
+// ------------------------------------------------------------------ //
+// Each list's working value lives in the org `settings` JSONB under `key`.
+// When the key is unset, `items` (the seeded default) is used.
+
+export interface OptionList {
+  key: string;
+  label: string;
+  /** small badge under the label, e.g. "Optional Charges" */
+  sublabel?: string;
+  /** "filled" = solid indigo pills (editable masters), "outline" = light removable chips */
+  variant: "filled" | "outline";
+  /** whether each chip shows a pencil to rename in place */
+  editable?: boolean;
+  /** placeholder shown in the add-input */
+  placeholder?: string;
+  items: string[];
+}
+
+export const OPTIONS_LISTS: OptionList[] = [
+  {
+    key: "options_blood_component",
+    label: "Blood Component",
+    variant: "filled",
+    editable: true,
+    placeholder: "e.g. PRBC",
+    items: ["PRBC", "FFP", "PLC", "WB"],
+  },
+  {
+    key: "options_blood_bag_type",
+    label: "Blood Bag Type",
+    variant: "outline",
+    placeholder: "e.g. DB-SAGM-350",
+    items: [
+      "DB-SAGM-350", "DB-SAGM-450", "TB-SAGM-350", "TB-SAGM-450",
+      "QUADRA-350F", "QUADRA-450F", "QUADRA-350N", "QUADRA-450N",
+      "SDP-CLOSED", "SB-350", "SB-450", "DB-350", "DB-450", "TB-350", "TB-450",
+    ],
+  },
+  {
+    key: "options_blood_request",
+    label: "Blood Request",
+    sublabel: "Optional Charges",
+    variant: "outline",
+    placeholder: "e.g. Container Charges",
+    items: [
+      "Antibody screening (patient)", "Anti HBc", "Bacterial detection", "Chemiluminescence",
+      "Container Charges", "Grouping and cross matching by automation",
+      "Grouping and cross matching by semi automation", "Irradiation",
+      "IV Generation ELISA (HBsAg)", "IV Generation ELISA (HCV)", "IV Generation ELISA (HIV)",
+      "Leuco filtration Platelets", "Leuco filtration Red cells", "NAT",
+      "Phenotypic for extended serology", "Plasma Processing Charges (Buffy Coat Method)",
+      "Platelets Processing Charges (Buffy Coat Method)", "Processing Charges",
+      "Red Cells Processing Charges (Buffy Coat Method)",
+      "Reservation Charges (Grouping and cross matching)", "Transfer Bag",
+    ],
+  },
+  {
+    key: "options_transfusion_indication",
+    label: "Transfusion Indication",
+    variant: "filled",
+    placeholder: "e.g. Anaemia",
+    items: [
+      "Anaemia", "Bleed", "Bleeding Diathesis", "Burn", "Burn Case", "Cancer",
+      "Chronic Kidney Disease", "Chronic Renal Failure", "Coagulation Factor Deficiency",
+      "Dengue", "Dialysis", "Ectopic Pregnancy", "Exchange Transfusion", "Heart Surgery",
+      "H/T", "Liver Transplant", "Lower segment Caesarean section", "Low Platelet Level",
+      "Massive Blood Transfusion", "Neonatal Exchange Transfusion", "Neonate",
+      "Neurogenic Disease", "Other", "Platelet Dysfunction", "Pregnancy",
+      "Pulmonary Heart Disease", "Road Traffic Accident", "Shock", "Surgery",
+      "Thalassemia", "Trauma",
+    ],
+  },
+  {
+    key: "options_defer_reason",
+    label: "Defer Reason",
+    variant: "outline",
+    placeholder: "e.g. Low H.B",
+    items: [
+      "Abortion", "Acute Infection Of Bladder (Cystitis) / Uti",
+      "Acute Infection Of Kidney (Pyelonephritis)", "Angina Pectoris", "Ankylosing Spondylitis",
+      "Anti-Arrhythmic, Anti-Covulsions, Anticoagulant, Anti-Thyroid Drugs, Cytotoxic Drugs, Cardiac Failure Drugs (Digitalis)",
+      "Antibiotics", "Anti Rabies Vaccination Following Animal Bite",
+      "Anti-Tetanus Serum, Anti-Venom Serum, Anti-Diphtheria Serum And Anti-Gas Gangrene Serum",
+      "Anxiety And Mood Disorders", "Any Medication Of Unknown Nature", "Asthmatic Attack",
+      "Asthmatics On Steroids", "At Risk For Hepatitis By Tattoos, Acupuncture, Body Piercing Or Scarification",
+      "Bleeding Disorder And Unexplained Bleeding Tendency", "Breast Feeding", "Cancer Surgery",
+      "Cardiac Medication (Digitalis, Nitro-Glycerine)", "Chest Pain",
+      "Chronic Infection Of Kidney/ Kidney Disease/ Renal Failure",
+      "Chronic Liver Disease / Liver Failure", "Chronic Sinusitis",
+      "Cold, Flu, Cough, Sore Throat Or Acute Sinusitis", "Conjunctivitis",
+      "Convulsions And Epilepsy", "Coronary Artery Disease", "Dengue/ Chikungunya",
+      "Dental Surgery Under Anaethesia", "Dermatomyosis", "Diarrhoea",
+      "Donors Who Have Had An Unexplained Delayed Faint",
+      "Etretinate, Acitretin Or Isotretinoin (Used For Acne)",
+      "Finasteride/Dutasteride (Used To Treat Benign Prostatatic Hyperplasia)", "Gi Endoscopy",
+      "Gonorrhoea", "Haemoglobinopathies And Red Cell Enzyme Deficiencies With Known History Of Haemolysis",
+      "Have Aids", "Have/At Risk Of HIV Infection", "Hepatitis B,C",
+      "Hepatitis B Immunoglobulin(S)", "History Of Malignant Thyroid Tumours",
+      "History Of Measles, Mumps, Chickenpox", "Hyper/Hypo Thyroid", "Hypertensive Heart Disease",
+      "Insulin", "Jaundice (Hepatitis A)", "Jaundice (Hepatitis B/C)",
+      "Ketoconazole, Antihelminthic Drugs", "Leishmaniasis", "Leprosy", "Live Attenuated Vaccines",
+      "Low H.B", "Major Surgery", "Malaria", "Malignancy", "Menstruation",
+      "Minor Non Specific Symptoms ( Malaise, Pain, Headache Etc )", "Minor Surgery",
+      "Myocardial Infarction (Heart Attack)", "Non Live Vaccines And Toxoid",
+      "Open Heart Surgery Including By-Pass Surgery", "Oral Anti-Diabetic Drugs", "Osteomyelitis",
+      "Other Endocrine Disorders", "Piroxicam, Dipyridamole", "Polycythaemia Vera", "Pregnancy",
+      "Radioactive Contrast Material", "Received Blood Transfusion",
+      "Recipient Of Organ, Stem Cell And Tissue Transplants", "Repeat Donor",
+      "Resident of other countries", "Rheumatic Heart Disease With Residual Damage",
+      "Salicylates (Aspirin), Other NSAIDS", "Schizophrenia", "Scleroderma",
+      "Severe Allergic Disorders", "Shortness Of Breath",
+      "Spouse/ Close Contact With Individual Suffering With Hepatitis",
+      "Spouse/ Partner Of Individual Receiving Transufsion Of Blood/Components",
+      "Stomach Ulcer With Symptoms Or With Recurrent Bleeding", "Sverre Rheumatoid Arthritis",
+      "Swelling Of Feet", "Swine Flu", "Syphilis (Genital Sore Or Generalised Skin Rashes)",
+      "Systemic Lupus Erythematosis", "Thyroid Disease Under Investigation/ Not Known Hepatitis A Or E",
+      "Thyrotoxicosis Due To Grave's Disease", "Ticlopidine, Clopidogrel", "Tooth Extraction",
+      "Tuberculosis", "Typhoid", "Unknown Hepatitis", "Unwilling", "Zika Virus/ West Nile Virus",
+    ],
+  },
+  {
+    key: "options_component_volume",
+    label: "Component Volume",
+    variant: "outline",
+    placeholder: "e.g. 350 ml",
+    items: [],
+  },
+  {
+    key: "options_optional_item_charges",
+    label: "Optional Item Charges",
+    variant: "outline",
+    placeholder: "e.g. Transfer Bag",
+    items: [],
+  },
+  {
+    key: "options_name_prefix",
+    label: "Name Prefix",
+    variant: "outline",
+    placeholder: "e.g. Mr. / Male",
+    items: ["Mr. / Male", "Ms. / Female", "Mrs. / Female", "Master / Male", "Baby"],
+  },
 ];
 
 export const BILLING_FIELDS: SettingField[] = [
